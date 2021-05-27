@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "baseUrl": "./",
+    "outDir": "./dist/out-tsc",
+    "sourceMap": true,
+    "module": "commonjs" /* Specify module code generation: 'none', 'commonjs', 'amd', 'system', 'umd', 'es2015', or 'ESNext'. */,
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "importHelpers": true,
+    "target": "es6",
+    "typeRoots": ["node_modules/@types"],
+    "lib": ["es2018", "dom"],
+    "paths": {
+      "*": ["node_modules/*"]
+    },
+    "allowSyntheticDefaultImports": true,
+    "noImplicitReturns": true,
+    "alwaysStrict": true,
+    "types": ["node"] /* Type declaration files to be included in compilation. */,
+    "resolveJsonModule": true
+  },
+  "files": ["src/index.ts"],
+  "include": ["./src/**/*"]
+}
