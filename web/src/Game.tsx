@@ -63,9 +63,10 @@ class Board extends Component<BoardProps, {}> {
 
 interface GameState {
   history: { squares: string[] }[];
-  xIsNext: boolean;
+  playersTurn: Player;
   currentMoveIdx: number;
   ws: WebSocket | null;
+  myPlayer: Player | null;
 }
 
 interface GameProps {
@@ -82,9 +83,10 @@ class Game extends Component<GameProps, GameState> {
           squares: Array(9).fill(null),
         },
       ],
-      xIsNext: true,
+      playersTurn: Player.X,
       currentMoveIdx: 0,
       ws: null,
+      myPlayer: null
     };
 
     this.handleClick = this.handleClick.bind(this);
@@ -114,9 +116,14 @@ class Game extends Component<GameProps, GameState> {
                     squares: newBoardState,
                   },
                 ]),
-                xIsNext: !this.state.xIsNext,
+                playersTurn:  this.state.playersTurn === Player.X ? Player.O : Player.X,
                 currentMoveIdx: this.state.currentMoveIdx + 1,
               });
+              break;
+            case ServerCommand.player:
+              this.setState({
+                myPlayer: msg.payload.player,
+              })
           }
         }
       };
@@ -130,13 +137,13 @@ class Game extends Component<GameProps, GameState> {
 
   handleClick(i: number) {
     // Users are not allowed to modify the past (see grandfather paradox).
-    if (this.state.currentMoveIdx !== this.state.history.length - 1) {
+    if (this.state.currentMoveIdx !== this.state.history.length - 1 || this.state.playersTurn !== this.state.myPlayer) {
       return;
     }
 
     if (!this.currentBoardState[i]) {
       if (this.state.ws) {
-        const clientMsg: ClientMessage = {cmd: ClientCommand.move, payload: {location: i, player: this.state.xIsNext ? Player.X : Player.O}}
+        const clientMsg: ClientMessage = {cmd: ClientCommand.move, payload: {location: i, player: this.state.playersTurn}}
         this.state.ws.send(JSON.stringify(clientMsg));
       }
     }
@@ -180,8 +187,10 @@ class Game extends Component<GameProps, GameState> {
     if (winner) {
       status = `Winner: ${winner}`;
     } else {
-      status = `Next player: ${this.state.xIsNext ? "X" : "O"}`;
+      status = `Next player: ${this.state.playersTurn}`;
     }
+
+    const playerStatus = `I am: ${this.state.myPlayer}`;
 
     const moves = this.state.history.map((step, move) => {
       const desc = move ? "Go to move #" + move : "Go to game start";
@@ -197,12 +206,13 @@ class Game extends Component<GameProps, GameState> {
         <div className="game-board">
           <Board
             squares={this.currentBoardState}
-            xIsNext={this.state.xIsNext}
+            xIsNext={this.state.playersTurn === Player.X}
             squareClick={this.handleClick}
           />
         </div>
         <div className="game-info">
           <div>{status}</div>
+          <div>{playerStatus}</div>
           <ol>{moves}</ol>
         </div>
       </div>

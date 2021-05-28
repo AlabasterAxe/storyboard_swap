@@ -2,12 +2,13 @@ import Boom from "@hapi/boom";
 import Hapi from "@hapi/hapi";
 import { v4 as uuidv4 } from "uuid";
 import * as WebSocket from "ws";
-import { Room } from "../../common/src/model";
+import { Player, Room } from "../../common/src/model";
 import {
   BoardPayload,
   ClientCommand,
   ClientMessage,
   CreateRoomResp,
+  PlayerPayload,
   ServerCommand,
 } from "../../common/src/transfer";
 
@@ -72,7 +73,7 @@ const init = async () => {
                 blah.ws.send(JSON.stringify({ cmd: "PING" }));
               }
             }, 5000);
-            console.log("WE GOT A LIVE ONE!");
+            console.log("player connected");
           },
           disconnect: (blah: any) => {
             if (blah.ctx.to) {
@@ -95,14 +96,19 @@ const init = async () => {
 
       if (initially) {
         const roomId = request.params.roomId;
-        if (rooms.has(roomId)) {
-          const room = rooms.get(roomId);
-          if (room) {
-            room.participants.push(ws);
+        let player = Player.X;
+        const room = rooms.get(roomId);
+        if (room) {
+          room.participants.push(ws);
+          if (room.participants.length > 1) {
+            player = Player.O;
           }
         }
         ctx.roomId = roomId;
-        ws.send(JSON.stringify({ cmd: "HELLO" }));
+        const payload: PlayerPayload = {
+          player,
+        };
+        ws.send(JSON.stringify({ cmd: ServerCommand.player, payload }));
         return "";
       }
 
