@@ -35,6 +35,7 @@ const init = async () => {
     handler: (request, h) => {
       const newRoom: Room = {
         id: uuidv4(),
+        participants: [],
       };
       rooms.set(newRoom.id, newRoom);
 
@@ -48,24 +49,30 @@ const init = async () => {
 
   server.route({
     method: "POST",
-    path: "/connect",
+    path: "/connect/{roomId}",
     options: {
       response: { emptyStatusCode: 204 },
       payload: { output: "data", parse: true, allow: "application/json" },
       plugins: {
         websocket: {
           initially: true,
-          connect: ({ ctx, ws }: { ctx: any; ws: any }) => {
-            ctx.to = setInterval(() => {
-              if (ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ cmd: "PING" }));
+          connect: (blah: any) => {
+            blah.ctx.to = setInterval(() => {
+              if (blah.ws.readyState === WebSocket.OPEN) {
+                blah.ws.send(JSON.stringify({ cmd: "PING" }));
               }
             }, 5000);
           },
-          disconnect: ({ ctx }: { ctx: any }) => {
-            if (ctx.to !== null) {
-              clearInterval(ctx.to);
-              ctx.to = null;
+          disconnect: (blah: any) => {
+            if (blah.ctx.to) {
+              clearInterval(blah.ctx.to);
+              blah.ctx.to = null;
+            }
+            if (blah.ctx.roomId) {
+              const room = rooms.get(blah.ctx.roomId);
+              if (room) {
+                room.participants.splice(room.participants.indexOf(blah.ws), 1);
+              }
             }
           },
         },
@@ -73,9 +80,17 @@ const init = async () => {
     },
     handler: (request, h) => {
       // todo see if we can type this somehow.
-      const { initially, ws } = (request as any).websocket();
+      const { initially, ws, ctx } = (request as any).websocket();
 
       if (initially) {
+        const roomId = request.params.roomId;
+        if (rooms.has(roomId)) {
+          const room = rooms.get(roomId);
+          if (room) {
+            room.participants.push(ws);
+          }
+        }
+        ctx.roomId = roomId;
         ws.send(JSON.stringify({ cmd: "HELLO" }));
         return "";
       }
@@ -90,10 +105,13 @@ const init = async () => {
         case "PING":
           return { result: "PONG" };
         case "AWAKE-ALL":
-          const peers = (request as any).websocket().peers;
-          peers.forEach((peer: any) => {
-            peer.send(JSON.stringify({ cmd: "AWAKE" }));
-          });
+          const room = rooms.get(ctx.roomId);
+          if (room) {
+            const peers = room.participants;
+            peers.forEach((peer: any) => {
+              peer.send(JSON.stringify({ cmd: "AWAKE" }));
+            });
+          }
           return "";
         default:
           return Boom.badRequest("unknown command");
