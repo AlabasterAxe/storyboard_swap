@@ -54,11 +54,16 @@ interface GameState {
   history: {squares: string[]}[];
   xIsNext: boolean;
   currentMoveIdx: number;
+  ws: WebSocket;
 }
 
-class Game extends Component<{},GameState> {
+interface GameProps {
+  match: {params: {gameId: string}}
+}
 
-  constructor(props: {}) {
+class Game extends Component<GameProps,GameState> {
+
+  constructor(props: GameProps) {
     super(props);
 
     this.state = {
@@ -67,6 +72,7 @@ class Game extends Component<{},GameState> {
       }],
       xIsNext: true,
       currentMoveIdx: 0,
+      ws: new WebSocket(`ws://localhost:3001/connect/${props.match.params.gameId}`),
     }
 
     this.handleClick = this.handleClick.bind(this);

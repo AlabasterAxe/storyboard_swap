@@ -62,6 +62,7 @@ const init = async () => {
                 blah.ws.send(JSON.stringify({ cmd: "PING" }));
               }
             }, 5000);
+            console.log("WE GOT A LIVE ONE!");
           },
           disconnect: (blah: any) => {
             if (blah.ctx.to) {
