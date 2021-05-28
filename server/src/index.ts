@@ -19,7 +19,7 @@ const rooms = new Map<string, Room>();
 
 const init = async () => {
   const server = Hapi.server({
-    port: 3001,
+    port: 8080,
     host: "localhost",
     state: {
       strictHeader: false,
