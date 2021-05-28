@@ -125,7 +125,9 @@ const init = async () => {
 
           if (room) {
             const peers = room.participants;
-            room.board[message.payload.location] = message.payload.player;
+            room.board[
+              message.payload.location
+            ] = `${message.payload.player}-${message.payload.move}`;
             peers.forEach((peer: any) => {
               const msgPayload: BoardPayload = {
                 board: room.board,

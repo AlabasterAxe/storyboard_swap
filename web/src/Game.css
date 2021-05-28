@@ -30,6 +30,9 @@ ol, ul {
   padding: 0;
   text-align: center;
   width: 34px;
+  display: flex;
+  align-items:flex-end;
+  justify-content: center;
 }
 
 .square:focus {
@@ -47,4 +50,32 @@ ol, ul {
 
 .game-info {
   margin-left: 20px;
+}
+
+svg {
+  height: 100%;
+  width: 100%;
+}
+
+.size-1 {
+  height: 50%;
+  width: 50%;
+}
+
+.size-2 {
+  height: 75%;
+  width: 75%;
+}
+
+.size-3 {
+  height: 100%;
+  width: 100%;
+}
+
+.move-option-row {
+  display: flex;
+}
+
+.selected {
+  background-color: lightblue;
 }

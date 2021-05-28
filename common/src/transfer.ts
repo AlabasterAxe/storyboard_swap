@@ -1,4 +1,4 @@
-import { Player } from "./model";
+import { Player, PlayerMove } from "./model";
 
 export interface CreateRoomRqst {}
 
@@ -24,6 +24,7 @@ export enum ServerCommand {
 
 export interface MovePayload {
   player: Player;
+  move: PlayerMove;
   location: number;
 }
 
