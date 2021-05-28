@@ -1,9 +1,14 @@
-import Hapi from "@hapi/hapi";
 import Boom from "@hapi/boom";
+import Hapi from "@hapi/hapi";
 import { v4 as uuidv4 } from "uuid";
-import { Room } from "./model";
-import { ConnectRqst, CreateRoomResp } from "./transfer";
 import * as WebSocket from "ws";
+import { Room } from "../../common/src/model";
+import {
+  ClientCommand,
+  ClientMessage,
+  CreateRoomResp,
+  ServerCommand,
+} from "../../common/src/transfer";
 
 // hapi-plugin-websocket doesn't have types :/
 const HAPIWebSocket = require("hapi-plugin-websocket");
@@ -36,6 +41,7 @@ const init = async () => {
       const newRoom: Room = {
         id: uuidv4(),
         participants: [],
+        board: Array(9).fill(null),
       };
       rooms.set(newRoom.id, newRoom);
 
@@ -99,18 +105,26 @@ const init = async () => {
       if (typeof request.payload !== "object" || request.payload === null) {
         return Boom.badRequest("invalid request");
       }
-      if (typeof (request.payload as any).cmd !== "string") {
+      const message = request.payload as ClientMessage;
+      if (typeof message.cmd !== "string") {
         return Boom.badRequest("must supply cmd field on req object");
       }
-      switch ((request.payload as any).cmd) {
-        case "PING":
-          return { result: "PONG" };
-        case "AWAKE-ALL":
+      switch (message.cmd) {
+        case ClientCommand.move:
           const room = rooms.get(ctx.roomId);
+
           if (room) {
             const peers = room.participants;
+            room.board[message.payload.location] = message.payload.player;
             peers.forEach((peer: any) => {
-              peer.send(JSON.stringify({ cmd: "AWAKE" }));
+              peer.send(
+                JSON.stringify({
+                  cmd: ServerCommand.board,
+                  payload: {
+                    world: room.board,
+                  },
+                })
+              );
             });
           }
           return "";

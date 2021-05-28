@@ -1,4 +1,5 @@
 import React, {Component} from "react";
+import { ServerCommand, ServerMessage } from "../../common/src/transfer";
 import "./Game.css";
 
 interface SquareProps {
@@ -54,7 +55,7 @@ interface GameState {
   history: {squares: string[]}[];
   xIsNext: boolean;
   currentMoveIdx: number;
-  ws: WebSocket;
+  ws: WebSocket | null;
 }
 
 interface GameProps {
@@ -72,10 +73,32 @@ class Game extends Component<GameProps,GameState> {
       }],
       xIsNext: true,
       currentMoveIdx: 0,
-      ws: new WebSocket(`ws://localhost:3001/connect/${props.match.params.gameId}`),
+      ws: null,
     }
 
     this.handleClick = this.handleClick.bind(this);
+  }
+
+  componentDidMount() {
+    const webby = new WebSocket(`ws://localhost:3001/connect/${this.props.match.params.gameId}`);
+    webby.onmessage = (event) => {
+      console.log(event);
+      const msg: ServerMessage = JSON.parse(event.data)
+      if (msg.cmd) {
+        switch (msg.cmd) {
+          case ServerCommand.board:
+            const newBoardState = msg.payload.board
+            this.setState({
+              history: this.state.history.concat([{
+                squares: newBoardState,
+              }]),
+              xIsNext: !this.state.xIsNext,
+              currentMoveIdx: this.state.currentMoveIdx + 1,
+            });
+        }
+      }
+    };
+    this.setState({ws: webby});
   }
 
   get currentBoardState() : string[] {
