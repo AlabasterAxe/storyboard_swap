@@ -1,18 +1,25 @@
-import React, {Component} from "react";
-import { ServerCommand, ServerMessage } from "../../common/src/transfer";
+import React, { Component } from "react";
+import { Player } from "../../common/src/model";
+import {
+  ClientCommand,
+  ClientMessage,
+  CreateRoomResp,
+  ServerCommand,
+  ServerMessage,
+} from "../../common/src/transfer";
 import "./Game.css";
 
 interface SquareProps {
-  value: string  
-  onClick: () => void
+  value: string;
+  onClick: () => void;
 }
 
 function Square(props: SquareProps) {
-    return (
-      <button className="square" onClick={props.onClick}>
-        {props.value ? props.value: ""}
-      </button>
-    );
+  return (
+    <button className="square" onClick={props.onClick}>
+      {props.value ? props.value : ""}
+    </button>
+  );
 }
 
 interface BoardProps {
@@ -22,13 +29,16 @@ interface BoardProps {
 }
 
 class Board extends Component<BoardProps, {}> {
-  
   renderSquare(i: number) {
-    return <Square value={this.props.squares[i]} onClick={ ()=>this.props.squareClick(i) } />;
+    return (
+      <Square
+        value={this.props.squares[i]}
+        onClick={() => this.props.squareClick(i)}
+      />
+    );
   }
 
   render() {
-    
     return (
       <div>
         <div className="board-row">
@@ -52,56 +62,69 @@ class Board extends Component<BoardProps, {}> {
 }
 
 interface GameState {
-  history: {squares: string[]}[];
+  history: { squares: string[] }[];
   xIsNext: boolean;
   currentMoveIdx: number;
   ws: WebSocket | null;
 }
 
 interface GameProps {
-  match: {params: {gameId: string}}
+  match: { params: { gameId: string } };
 }
 
-class Game extends Component<GameProps,GameState> {
-
+class Game extends Component<GameProps, GameState> {
   constructor(props: GameProps) {
     super(props);
 
     this.state = {
-      history: [{
-        squares: Array(9).fill(null),
-      }],
+      history: [
+        {
+          squares: Array(9).fill(null),
+        },
+      ],
       xIsNext: true,
       currentMoveIdx: 0,
       ws: null,
-    }
+    };
 
     this.handleClick = this.handleClick.bind(this);
   }
 
   componentDidMount() {
-    const webby = new WebSocket(`ws://localhost:3001/connect/${this.props.match.params.gameId}`);
-    webby.onmessage = (event) => {
-      console.log(event);
-      const msg: ServerMessage = JSON.parse(event.data)
-      if (msg.cmd) {
-        switch (msg.cmd) {
-          case ServerCommand.board:
-            const newBoardState = msg.payload.board
-            this.setState({
-              history: this.state.history.concat([{
-                squares: newBoardState,
-              }]),
-              xIsNext: !this.state.xIsNext,
-              currentMoveIdx: this.state.currentMoveIdx + 1,
-            });
+    const gameId = this.props.match.params.gameId;
+
+    (gameId === "new"
+      ? fetch("http://localhost:3001/new_room")
+          .then((response) => response.json())
+          .then((data: CreateRoomResp) => data.roomId)
+      : Promise.resolve(gameId)
+    ).then((gameId) => {
+      window.history.replaceState(null, "Game", `/g/${gameId}`)
+      const webby = new WebSocket(`ws://localhost:3001/connect/${gameId}`);
+      webby.onmessage = (event) => {
+        console.log(event);
+        const msg: ServerMessage = JSON.parse(event.data);
+        if (msg.cmd) {
+          switch (msg.cmd) {
+            case ServerCommand.board:
+              const newBoardState = msg.payload.board;
+              this.setState({
+                history: this.state.history.concat([
+                  {
+                    squares: newBoardState,
+                  },
+                ]),
+                xIsNext: !this.state.xIsNext,
+                currentMoveIdx: this.state.currentMoveIdx + 1,
+              });
+          }
         }
-      }
-    };
-    this.setState({ws: webby});
+      };
+      this.setState({ ws: webby });
+    });
   }
 
-  get currentBoardState() : string[] {
+  get currentBoardState(): string[] {
     return this.state.history[this.state.currentMoveIdx].squares;
   }
 
@@ -112,38 +135,32 @@ class Game extends Component<GameProps,GameState> {
     }
 
     if (!this.currentBoardState[i]) {
-      this.setState(()=>{
-        const newBoardState = [ ...this.currentBoardState ];
-        newBoardState[i] = this.state.xIsNext ? "X" : "O";
-        return {
-          history: this.state.history.concat([{
-            squares: newBoardState,
-          }]),
-          xIsNext: !this.state.xIsNext,
-          currentMoveIdx: this.state.currentMoveIdx + 1,
-        };
-      });
+      if (this.state.ws) {
+        const clientMsg: ClientMessage = {cmd: ClientCommand.move, payload: {location: i, player: this.state.xIsNext ? Player.X : Player.O}}
+        this.state.ws.send(JSON.stringify(clientMsg));
+      }
     }
   }
 
   calculateWinner(squares: string[]): string | null {
     const lines = [
-      [0,1,2],
-      [3,4,5],
-      [6,7,8],
-      [0,3,6],
-      [1,4,7],
-      [2,5,8],
+      [0, 1, 2],
+      [3, 4, 5],
+      [6, 7, 8],
+      [0, 3, 6],
+      [1, 4, 7],
+      [2, 5, 8],
       [0, 4, 8],
       [2, 4, 6],
-    ]
+    ];
 
     for (const line of lines) {
-      const [a,b,c] = line;
+      const [a, b, c] = line;
       if (
         squares[a] &&
         squares[a] === squares[b] &&
-        squares[b] === squares[c]) {
+        squares[b] === squares[c]
+      ) {
         return squares[a];
       }
     }
@@ -154,7 +171,7 @@ class Game extends Component<GameProps,GameState> {
   jumpTo(moveNum: number) {
     this.setState({
       currentMoveIdx: moveNum,
-    })
+    });
   }
 
   render() {
@@ -167,9 +184,7 @@ class Game extends Component<GameProps,GameState> {
     }
 
     const moves = this.state.history.map((step, move) => {
-      const desc = move ?
-        'Go to move #' + move :
-        'Go to game start';
+      const desc = move ? "Go to move #" + move : "Go to game start";
       return (
         <li key={move}>
           <button onClick={() => this.jumpTo(move)}>{desc}</button>
@@ -177,23 +192,24 @@ class Game extends Component<GameProps,GameState> {
       );
     });
 
-    return (<div className="game">
+    return (
+      <div className="game">
         <div className="game-board">
           <Board
-          squares={this.currentBoardState}
-          xIsNext={this.state.xIsNext}
-          squareClick={this.handleClick}
+            squares={this.currentBoardState}
+            xIsNext={this.state.xIsNext}
+            squareClick={this.handleClick}
           />
         </div>
         <div className="game-info">
           <div>{status}</div>
           <ol>{moves}</ol>
         </div>
-      </div>);
+      </div>
+    );
   }
 }
 
 // ========================================
 
 export default Game;
-

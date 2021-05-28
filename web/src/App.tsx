@@ -6,7 +6,7 @@ import Game from './Game';
 
 function Home() {
   return (
-    <Link to="/g/95209318-e004-4ce9-a875-97d55709642d">Start Game</Link>
+    <Link to="/g/new">Start Game</Link>
   )
 }
 

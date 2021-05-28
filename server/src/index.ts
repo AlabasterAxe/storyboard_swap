@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 import * as WebSocket from "ws";
 import { Room } from "../../common/src/model";
 import {
+  BoardPayload,
   ClientCommand,
   ClientMessage,
   CreateRoomResp,
@@ -37,6 +38,9 @@ const init = async () => {
   server.route({
     method: "GET",
     path: "/new_room",
+    options: {
+      cors: true,
+    },
     handler: (request, h) => {
       const newRoom: Room = {
         id: uuidv4(),
@@ -117,12 +121,13 @@ const init = async () => {
             const peers = room.participants;
             room.board[message.payload.location] = message.payload.player;
             peers.forEach((peer: any) => {
+              const msgPayload: BoardPayload = {
+                board: room.board,
+              };
               peer.send(
                 JSON.stringify({
                   cmd: ServerCommand.board,
-                  payload: {
-                    world: room.board,
-                  },
+                  payload: msgPayload,
                 })
               );
             });
