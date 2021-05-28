@@ -15,6 +15,7 @@
     },
     "allowSyntheticDefaultImports": true,
     "noImplicitReturns": true,
+    "strict": true,
     "alwaysStrict": true,
     "types": ["node"] /* Type declaration files to be included in compilation. */,
     "resolveJsonModule": true
