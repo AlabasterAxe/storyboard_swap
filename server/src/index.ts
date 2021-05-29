@@ -29,39 +29,6 @@ const init = async () => {
   await server.register(require("@hapi/inert"));
 
   server.route({
-    method: "GET",
-    path: "/{param*}",
-    handler: {
-      directory: {
-        path: STATIC_ROOT,
-        index: ["index.html"],
-      },
-    },
-  });
-
-  server.route({
-    method: "GET",
-    path: "/api/new_room",
-    options: {
-      cors: true,
-    },
-    handler: (request, h) => {
-      const newRoom: Room = {
-        id: uuidv4(),
-        participants: [],
-        board: Array(9).fill(null),
-      };
-      rooms.set(newRoom.id, newRoom);
-
-      const resp: CreateRoomResp = {
-        roomId: newRoom.id,
-      };
-
-      return resp;
-    },
-  });
-
-  server.route({
     method: "POST",
     path: "/api/connect/{roomId}",
     options: {
@@ -148,6 +115,49 @@ const init = async () => {
           return Boom.badRequest("unknown command");
       }
     },
+  });
+
+  server.route({
+    method: "GET",
+    path: "/api/new_room",
+    options: {
+      cors: true,
+    },
+    handler: (request, h) => {
+      const newRoom: Room = {
+        id: uuidv4(),
+        participants: [],
+        board: Array(9).fill(null),
+      };
+      rooms.set(newRoom.id, newRoom);
+
+      const resp: CreateRoomResp = {
+        roomId: newRoom.id,
+      };
+
+      return resp;
+    },
+  });
+
+  server.route({
+    method: "GET",
+    path: "/{param*}",
+    handler: {
+      directory: {
+        path: STATIC_ROOT,
+        index: "index.html",
+      },
+    },
+  });
+
+  // redirect not founds to index
+  server.ext("onPreResponse", (request, h: any) => {
+    const response = request.response;
+    if (response instanceof Error && response.output.statusCode === 404) {
+      return h.file(`${STATIC_ROOT}/index.html`);
+    }
+
+    return h.continue;
   });
 
   await server.start();
