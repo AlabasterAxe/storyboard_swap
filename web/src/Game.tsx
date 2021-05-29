@@ -49,7 +49,7 @@ class Board extends Component<BoardProps, {}> {
 
   render() {
     return (
-      <div>
+      <div className="board-grid">
         <div className="board-row">
           {this.renderSquare(0)}
           {this.renderSquare(1)}
@@ -78,6 +78,7 @@ interface GameState {
   myPlayer: Player | null;
   remainingMoves: PlayerMove[];
   selectedMove: PlayerMove | null;
+  winner: Player | null;
 }
 
 interface GameProps {
@@ -107,6 +108,7 @@ class Game extends Component<GameProps, GameState> {
         PlayerMove.small_2,
       ],
       selectedMove: null,
+      winner: null,
     };
 
     this.handleClick = this.handleClick.bind(this);
@@ -130,6 +132,7 @@ class Game extends Component<GameProps, GameState> {
           switch (msg.cmd) {
             case ServerCommand.board:
               const newBoardState = msg.payload.board;
+              const winner = this.calculateWinner(newBoardState);
               this.setState({
                 history: this.state.history.concat([
                   {
@@ -138,6 +141,7 @@ class Game extends Component<GameProps, GameState> {
                 ]),
                 playersTurn:  this.state.playersTurn === Player.X ? Player.O : Player.X,
                 currentMoveIdx: this.state.currentMoveIdx + 1,
+                winner: winner,
               });
               break;
             case ServerCommand.player:
@@ -174,10 +178,11 @@ class Game extends Component<GameProps, GameState> {
     // Users are not allowed to modify the past (see grandfather paradox).
     // TODO: warn users when no move is selected
     if (this.state.currentMoveIdx !== this.state.history.length - 1 ||
-      this.state.playersTurn !== this.state.myPlayer ||
-      !this.state.selectedMove
+      this.state.playersTurn !== this.state.myPlayer || 
+      !this.state.selectedMove ||
+      this.state.winner
       ) {
-      return;
+      return false;
     }
 
     if (this.isMovePossible(this.currentBoardState[i], this.state.selectedMove)) {
@@ -194,7 +199,7 @@ class Game extends Component<GameProps, GameState> {
     }
   }
 
-  calculateWinner(squares: string[]): string | null {
+  calculateWinner(squares: string[]): Player | null {
     const lines = [
       [0, 1, 2],
       [3, 4, 5],
@@ -213,7 +218,7 @@ class Game extends Component<GameProps, GameState> {
         squares[a][0] === squares[b][0] &&
         squares[b][0] === squares[c][0]
       ) {
-        return squares[a];
+        return squares[a] as Player;
       }
     }
 
@@ -226,16 +231,17 @@ class Game extends Component<GameProps, GameState> {
     });
   }
 
-  render() {
-    const winner = this.calculateWinner(this.currentBoardState);
-    let status;
-    if (winner) {
-      status = `Winner: ${winner[0]}`;
-    } else {
-      status = `Next player: ${this.state.playersTurn}`;
-    }
+  getPlayerIndicator(player: string) {
+    return <span className={`${player} indicator`}></span>
+  }
 
-    const playerStatus = `I am: ${this.state.myPlayer}`;
+  render() {
+    let status;
+    if (this.state.winner) {
+      status = <span><span>Winner:</span> {this.getPlayerIndicator(this.state.winner[0])}</span>;
+    } else {
+      status = <span><span>Next player:</span>{this.getPlayerIndicator(this.state.playersTurn)}</span>;
+    }
 
     const moves = this.state.history.map((step, move) => {
       const desc = move ? "Go to move #" + move : "Go to game start";
@@ -248,7 +254,7 @@ class Game extends Component<GameProps, GameState> {
 
     const moveOptions = this.state.remainingMoves.map((move) => {
       const [size] = (move as string).split("-");
-      const classes = ["square"];
+      const classes = ["piece-square"];
       if (this.state.selectedMove === move) {
         classes.push("selected")
       }
@@ -267,16 +273,17 @@ class Game extends Component<GameProps, GameState> {
             xIsNext={this.state.playersTurn === Player.X}
             squareClick={this.handleClick}
           />
-          <div>Your Remaining Moves:</div>
-          <div className="move-option-row">
-            {moveOptions}
+          <div>
+            <div>{status}</div>
+            <div>Your Remaining Pieces:</div>
+            <div className="move-option-row">
+              {moveOptions}
+            </div>
           </div>
         </div>
-        <div className="game-info">
-          <div>{status}</div>
-          <div>{playerStatus}</div>
+        {/* <div className="game-info">
           <ol>{moves}</ol>
-        </div>
+        </div> */}
       </div>
     );
   }
