@@ -3,11 +3,13 @@ import Hapi from "@hapi/hapi";
 import { v4 as uuidv4 } from "uuid";
 import * as WebSocket from "ws";
 import { Player, Room } from "../../common/src/model";
+import { calculateWinner } from "../../common/src/calculate-winner";
 import {
   BoardPayload,
   ClientCommand,
   ClientMessage,
   CreateRoomResp,
+  HistoryPayload,
   PlayerPayload,
   ServerCommand,
 } from "../../common/src/transfer";
@@ -71,19 +73,28 @@ const init = async () => {
 
       if (initially) {
         const roomId = request.params.roomId;
-        let player = Player.X;
+        let player: Player | null = null;
         const room = rooms.get(roomId);
         if (room) {
           room.participants.push(ws);
-          if (room.participants.length > 1) {
+          if (room.participants.length == 1) {
+            player = Player.X;
+          } else if (room.participants.length == 2) {
             player = Player.O;
           }
+
+          const history: HistoryPayload = {
+            history: room.history,
+          };
+          ws.send(JSON.stringify({ cmd: ServerCommand.history, history }));
         }
+
         ctx.roomId = roomId;
         const payload: PlayerPayload = {
           player,
         };
         ws.send(JSON.stringify({ cmd: ServerCommand.player, payload }));
+
         return "";
       }
 
@@ -100,12 +111,18 @@ const init = async () => {
 
           if (room) {
             const peers = room.participants;
-            room.board[
-              message.payload.location
-            ] = `${message.payload.player}-${message.payload.move}`;
+            const newSnapshot = { ...room.history[room.history.length - 1] };
+            newSnapshot.board[
+              message.payload.playerMove.location
+            ] = `${message.payload.playerMove.player}-${message.payload.playerMove.piece}`;
+            newSnapshot.winner = calculateWinner(newSnapshot.board);
+            newSnapshot.playersTurn =
+              newSnapshot.playersTurn === Player.X ? Player.O : Player.X;
+
+            room.history.push(newSnapshot);
             peers.forEach((peer: any) => {
               const msgPayload: BoardPayload = {
-                board: room.board,
+                board: newSnapshot,
               };
               peer.send(
                 JSON.stringify({
@@ -132,7 +149,14 @@ const init = async () => {
       const newRoom: Room = {
         id: uuidv4(),
         participants: [],
-        board: Array(9).fill(null),
+        history: [
+          {
+            board: Array(9).fill(null),
+            playersTurn: Player.X,
+            previousMove: null,
+            winner: null,
+          },
+        ],
       };
       rooms.set(newRoom.id, newRoom);
 

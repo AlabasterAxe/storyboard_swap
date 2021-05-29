@@ -1,5 +1,5 @@
 import React, { Component } from "react";
-import { Player, PlayerMove } from "../../common/src/model";
+import { GameSnapshot, Player, PlayerPiece } from "../../common/src/model";
 import {
   ClientCommand,
   ClientMessage,
@@ -11,7 +11,8 @@ import "./Game.css";
 import {ReactComponent as X} from "./X.svg";
 import {ReactComponent as O} from "./O.svg";
 
-const SERVER_SPEC = "35.188.94.49:8080";
+// const SERVER_SPEC = "35.188.94.49:8080";
+const SERVER_SPEC = "localhost:8080";
 
 interface SquareProps {
   value: string;
@@ -71,14 +72,12 @@ class Board extends Component<BoardProps, {}> {
 }
 
 interface GameState {
-  history: { squares: string[] }[];
-  playersTurn: Player;
+  history: GameSnapshot[];
   currentMoveIdx: number;
   ws: WebSocket | null;
   myPlayer: Player | null;
-  remainingMoves: PlayerMove[];
-  selectedMove: PlayerMove | null;
-  winner: Player | null;
+  remainingMoves: PlayerPiece[];
+  selectedMove: PlayerPiece | null;
 }
 
 interface GameProps {
@@ -92,23 +91,24 @@ class Game extends Component<GameProps, GameState> {
     this.state = {
       history: [
         {
-          squares: Array(9).fill(null),
-        },
+          board: Array(9).fill(null),
+          playersTurn: Player.X,
+          previousMove: null,
+          winner: null,
+        }
       ],
-      playersTurn: Player.X,
       currentMoveIdx: 0,
       ws: null,
       myPlayer: null,
       remainingMoves: [
-        PlayerMove.large_1,
-        PlayerMove.large_2,
-        PlayerMove.medium_1,
-        PlayerMove.medium_2,
-        PlayerMove.small_1,
-        PlayerMove.small_2,
+        PlayerPiece.large_1,
+        PlayerPiece.large_2,
+        PlayerPiece.medium_1,
+        PlayerPiece.medium_2,
+        PlayerPiece.small_1,
+        PlayerPiece.small_2,
       ],
       selectedMove: null,
-      winner: null,
     };
 
     this.handleClick = this.handleClick.bind(this);
@@ -132,16 +132,17 @@ class Game extends Component<GameProps, GameState> {
           switch (msg.cmd) {
             case ServerCommand.board:
               const newBoardState = msg.payload.board;
-              const winner = this.calculateWinner(newBoardState);
               this.setState({
                 history: this.state.history.concat([
-                  {
-                    squares: newBoardState,
-                  },
+                  newBoardState
                 ]),
-                playersTurn:  this.state.playersTurn === Player.X ? Player.O : Player.X,
                 currentMoveIdx: this.state.currentMoveIdx + 1,
-                winner: winner,
+              });
+              break;
+            case ServerCommand.history:
+              this.setState({
+                history: msg.payload.history,
+                currentMoveIdx: msg.payload.history.length - 1,
               });
               break;
             case ServerCommand.player:
@@ -155,11 +156,11 @@ class Game extends Component<GameProps, GameState> {
     });
   }
 
-  get currentBoardState(): string[] {
-    return this.state.history[this.state.currentMoveIdx].squares;
+  get currentBoardState(): GameSnapshot {
+    return this.state.history[this.state.currentMoveIdx];
   }
 
-  isMovePossible(currentValue: string, proposedMove: PlayerMove): boolean {
+  isMovePossible(currentValue: string, proposedMove: PlayerPiece): boolean {
     if (!currentValue) {
       return true;
     }
@@ -178,16 +179,25 @@ class Game extends Component<GameProps, GameState> {
     // Users are not allowed to modify the past (see grandfather paradox).
     // TODO: warn users when no move is selected
     if (this.state.currentMoveIdx !== this.state.history.length - 1 ||
-      this.state.playersTurn !== this.state.myPlayer || 
+
+      // it's the other players turn
+      this.currentBoardState.playersTurn !== this.state.myPlayer || 
+
+      // the player hasn't selected a piece
       !this.state.selectedMove ||
-      this.state.winner
+
+      // there's a winner
+      this.currentBoardState.winner ||
+
+      // the person is a spectator
+      !this.state.myPlayer 
       ) {
       return false;
     }
 
-    if (this.isMovePossible(this.currentBoardState[i], this.state.selectedMove)) {
+    if (this.isMovePossible(this.currentBoardState.board[i], this.state.selectedMove)) {
       if (this.state.ws) {
-        const clientMsg: ClientMessage = {cmd: ClientCommand.move, payload: {location: i, player: this.state.playersTurn, move: this.state.selectedMove}}
+        const clientMsg: ClientMessage = {cmd: ClientCommand.move, payload: { playerMove: {location: i, player: this.currentBoardState.playersTurn, piece: this.state.selectedMove} }}
         this.state.ws.send(JSON.stringify(clientMsg));
         const newRemainingMoves = [...this.state.remainingMoves];
         newRemainingMoves.splice(newRemainingMoves.indexOf(this.state.selectedMove), 1);
@@ -197,32 +207,6 @@ class Game extends Component<GameProps, GameState> {
         });
       }
     }
-  }
-
-  calculateWinner(squares: string[]): Player | null {
-    const lines = [
-      [0, 1, 2],
-      [3, 4, 5],
-      [6, 7, 8],
-      [0, 3, 6],
-      [1, 4, 7],
-      [2, 5, 8],
-      [0, 4, 8],
-      [2, 4, 6],
-    ];
-
-    for (const line of lines) {
-      const [a, b, c] = line;
-      if (
-        squares[a] && squares[b] && squares[c] &&
-        squares[a][0] === squares[b][0] &&
-        squares[b][0] === squares[c][0]
-      ) {
-        return squares[a] as Player;
-      }
-    }
-
-    return null;
   }
 
   jumpTo(moveNum: number) {
@@ -237,10 +221,10 @@ class Game extends Component<GameProps, GameState> {
 
   render() {
     let status;
-    if (this.state.winner) {
-      status = <span><span>Winner:</span> {this.getPlayerIndicator(this.state.winner[0])}</span>;
+    if (this.currentBoardState.winner) {
+      status = <span><span>Winner:</span> {this.getPlayerIndicator(this.currentBoardState.winner[0])}</span>;
     } else {
-      status = <span><span>Next player:</span>{this.getPlayerIndicator(this.state.playersTurn)}</span>;
+      status = <span><span>Next player:</span>{this.getPlayerIndicator(this.currentBoardState.playersTurn)}</span>;
     }
 
     const moves = this.state.history.map((step, move) => {
@@ -269,16 +253,16 @@ class Game extends Component<GameProps, GameState> {
       <div className="game">
         <div className="game-board">
           <Board
-            squares={this.currentBoardState}
-            xIsNext={this.state.playersTurn === Player.X}
+            squares={this.currentBoardState.board}
+            xIsNext={this.currentBoardState.playersTurn === Player.X}
             squareClick={this.handleClick}
           />
           <div>
             <div>{status}</div>
-            <div>Your Remaining Pieces:</div>
+            {this.state.myPlayer ? (<div><div>Your Remaining Pieces:</div>
             <div className="move-option-row">
               {moveOptions}
-            </div>
+            </div></div>): <div></div>}
           </div>
         </div>
         {/* <div className="game-info">
