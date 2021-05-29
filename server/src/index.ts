@@ -12,10 +12,9 @@ import {
   ServerCommand,
 } from "../../common/src/transfer";
 
-// hapi-plugin-websocket doesn't have types :/
-const HAPIWebSocket = require("hapi-plugin-websocket");
-
 const rooms = new Map<string, Room>();
+
+const STATIC_ROOT = "../web/build";
 
 const init = async () => {
   const server = Hapi.server({
@@ -26,19 +25,23 @@ const init = async () => {
     },
   });
 
-  await server.register(HAPIWebSocket);
+  await server.register(require("hapi-plugin-websocket"));
+  await server.register(require("@hapi/inert"));
 
   server.route({
     method: "GET",
-    path: "/",
-    handler: (request, h) => {
-      return "Hello, world";
+    path: "/{param*}",
+    handler: {
+      directory: {
+        path: STATIC_ROOT,
+        index: ["index.html"],
+      },
     },
   });
 
   server.route({
     method: "GET",
-    path: "/new_room",
+    path: "/api/new_room",
     options: {
       cors: true,
     },
@@ -60,7 +63,7 @@ const init = async () => {
 
   server.route({
     method: "POST",
-    path: "/connect/{roomId}",
+    path: "/api/connect/{roomId}",
     options: {
       response: { emptyStatusCode: 204 },
       payload: { output: "data", parse: true, allow: "application/json" },

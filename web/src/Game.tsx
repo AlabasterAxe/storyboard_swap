@@ -11,6 +11,8 @@ import "./Game.css";
 import {ReactComponent as X} from "./X.svg";
 import {ReactComponent as O} from "./O.svg";
 
+const SERVER_SPEC = "35.188.94.49:8080";
+
 interface SquareProps {
   value: string;
   onClick: () => void;
@@ -114,13 +116,13 @@ class Game extends Component<GameProps, GameState> {
     const gameId = this.props.match.params.gameId;
 
     (gameId === "new"
-      ? fetch("http://localhost:3001/new_room")
+      ? fetch(`http://${SERVER_SPEC}/new_room`)
           .then((response) => response.json())
           .then((data: CreateRoomResp) => data.roomId)
       : Promise.resolve(gameId)
     ).then((gameId) => {
       window.history.replaceState(null, "Game", `/g/${gameId}`)
-      const webby = new WebSocket(`ws://localhost:3001/connect/${gameId}`);
+      const webby = new WebSocket(`ws://${SERVER_SPEC}/connect/${gameId}`);
       webby.onmessage = (event) => {
         console.log(event);
         const msg: ServerMessage = JSON.parse(event.data);
