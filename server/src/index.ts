@@ -23,6 +23,11 @@ const init = async () => {
     state: {
       strictHeader: false,
     },
+    routes: {
+      files: {
+        relativeTo: STATIC_ROOT,
+      },
+    },
   });
 
   await server.register(require("hapi-plugin-websocket"));
@@ -144,7 +149,7 @@ const init = async () => {
     path: "/{param*}",
     handler: {
       directory: {
-        path: STATIC_ROOT,
+        path: ".",
         index: "index.html",
       },
     },
@@ -154,7 +159,7 @@ const init = async () => {
   server.ext("onPreResponse", (request, h: any) => {
     const response = request.response;
     if (response instanceof Error && response.output.statusCode === 404) {
-      return h.file(`${STATIC_ROOT}/index.html`);
+      return h.file("index.html");
     }
 
     return h.continue;
