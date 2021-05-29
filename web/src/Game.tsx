@@ -116,13 +116,13 @@ class Game extends Component<GameProps, GameState> {
     const gameId = this.props.match.params.gameId;
 
     (gameId === "new"
-      ? fetch(`http://${SERVER_SPEC}/new_room`)
+      ? fetch(`http://${SERVER_SPEC}/api/new_room`)
           .then((response) => response.json())
           .then((data: CreateRoomResp) => data.roomId)
       : Promise.resolve(gameId)
     ).then((gameId) => {
       window.history.replaceState(null, "Game", `/g/${gameId}`)
-      const webby = new WebSocket(`ws://${SERVER_SPEC}/connect/${gameId}`);
+      const webby = new WebSocket(`ws://${SERVER_SPEC}/api/connect/${gameId}`);
       webby.onmessage = (event) => {
         console.log(event);
         const msg: ServerMessage = JSON.parse(event.data);
