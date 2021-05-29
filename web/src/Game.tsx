@@ -1,5 +1,5 @@
 import React, { Component } from "react";
-import { GameSnapshot, Player, PlayerPiece } from "../../common/src/model";
+import { allPlayerPieces, GameSnapshot, initialGameState, Player, PlayerPiece } from "../../common/src/model";
 import {
   ClientCommand,
   ClientMessage,
@@ -76,7 +76,6 @@ interface GameState {
   currentMoveIdx: number;
   ws: WebSocket | null;
   myPlayer: Player | null;
-  remainingMoves: PlayerPiece[];
   selectedMove: PlayerPiece | null;
 }
 
@@ -90,24 +89,11 @@ class Game extends Component<GameProps, GameState> {
 
     this.state = {
       history: [
-        {
-          board: Array(9).fill(null),
-          playersTurn: Player.X,
-          previousMove: null,
-          winner: null,
-        }
+        initialGameState(),
       ],
       currentMoveIdx: 0,
       ws: null,
       myPlayer: null,
-      remainingMoves: [
-        PlayerPiece.large_1,
-        PlayerPiece.large_2,
-        PlayerPiece.medium_1,
-        PlayerPiece.medium_2,
-        PlayerPiece.small_1,
-        PlayerPiece.small_2,
-      ],
       selectedMove: null,
     };
 
@@ -199,11 +185,9 @@ class Game extends Component<GameProps, GameState> {
       if (this.state.ws) {
         const clientMsg: ClientMessage = {cmd: ClientCommand.move, payload: { playerMove: {location: i, player: this.currentBoardState.playersTurn, piece: this.state.selectedMove} }}
         this.state.ws.send(JSON.stringify(clientMsg));
-        const newRemainingMoves = [...this.state.remainingMoves];
-        newRemainingMoves.splice(newRemainingMoves.indexOf(this.state.selectedMove), 1);
+        
         this.setState({
           selectedMove: null,
-          remainingMoves: newRemainingMoves,
         });
       }
     }
@@ -236,7 +220,7 @@ class Game extends Component<GameProps, GameState> {
       );
     });
 
-    const moveOptions = this.state.remainingMoves.map((move) => {
+    const moveOptions = (this.state.myPlayer === Player.X ? this.currentBoardState.remainingPiecesX : this.currentBoardState.remainingPiecesO).map((move) => {
       const [size] = (move as string).split("-");
       const classes = ["piece-square"];
       if (this.state.selectedMove === move) {

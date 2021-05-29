@@ -2,7 +2,7 @@ import Boom from "@hapi/boom";
 import Hapi from "@hapi/hapi";
 import { v4 as uuidv4 } from "uuid";
 import * as WebSocket from "ws";
-import { Player, Room } from "../../common/src/model";
+import { initialGameState, Player, Room } from "../../common/src/model";
 import { calculateWinner } from "../../common/src/calculate-winner";
 import {
   BoardPayload,
@@ -123,6 +123,21 @@ const init = async () => {
             newSnapshot.playersTurn =
               newSnapshot.playersTurn === Player.X ? Player.O : Player.X;
             newSnapshot.previousMove = message.payload.playerMove;
+            if (message.payload.playerMove.player === Player.X) {
+              const newRemainingPieces = [...newSnapshot.remainingPiecesX];
+              newRemainingPieces.splice(
+                newRemainingPieces.indexOf(message.payload.playerMove.piece),
+                1
+              );
+              newSnapshot.remainingPiecesX = newRemainingPieces;
+            } else {
+              const newRemainingPieces = [...newSnapshot.remainingPiecesO];
+              newRemainingPieces.splice(
+                newRemainingPieces.indexOf(message.payload.playerMove.piece),
+                1
+              );
+              newSnapshot.remainingPiecesO = newRemainingPieces;
+            }
 
             room.history.push(newSnapshot);
             peers.forEach((peer: any) => {
@@ -154,14 +169,7 @@ const init = async () => {
       const newRoom: Room = {
         id: uuidv4(),
         participants: [],
-        history: [
-          {
-            board: Array(9).fill(null),
-            playersTurn: Player.X,
-            previousMove: null,
-            winner: null,
-          },
-        ],
+        history: [initialGameState()],
       };
       rooms.set(newRoom.id, newRoom);
 
