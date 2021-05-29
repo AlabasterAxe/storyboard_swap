@@ -9,6 +9,7 @@ import {
   ClientCommand,
   ClientMessage,
   CreateRoomResp,
+  HistoryMessage,
   HistoryPayload,
   PlayerPayload,
   ServerCommand,
@@ -83,10 +84,13 @@ const init = async () => {
             player = Player.O;
           }
 
-          const history: HistoryPayload = {
-            history: room.history,
+          const historyMessage: HistoryMessage = {
+            cmd: ServerCommand.history,
+            payload: {
+              history: room.history,
+            },
           };
-          ws.send(JSON.stringify({ cmd: ServerCommand.history, history }));
+          ws.send(JSON.stringify(historyMessage));
         }
 
         ctx.roomId = roomId;
@@ -118,6 +122,7 @@ const init = async () => {
             newSnapshot.winner = calculateWinner(newSnapshot.board);
             newSnapshot.playersTurn =
               newSnapshot.playersTurn === Player.X ? Player.O : Player.X;
+            newSnapshot.previousMove = message.payload.playerMove;
 
             room.history.push(newSnapshot);
             peers.forEach((peer: any) => {
