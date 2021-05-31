@@ -11,8 +11,8 @@ import "./Game.css";
 import {ReactComponent as X} from "./X.svg";
 import {ReactComponent as O} from "./O.svg";
 
-// const SERVER_SPEC = "35.188.94.49:8080";
-const SERVER_SPEC = "localhost:8080";
+const SERVER_SPEC = "35.188.94.49:8080";
+// const SERVER_SPEC = "localhost:8080";
 
 interface SquareProps {
   value: string;
