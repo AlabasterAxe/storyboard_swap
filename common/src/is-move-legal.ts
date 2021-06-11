@@ -7,7 +7,7 @@ export function isMoveLegal(
   if (!currentValue) {
     return true;
   }
-  const [existingPlayer, existingSize] = currentValue.split("-");
+  const [_, existingSize] = currentValue.split("-");
   const [proposedSize] = proposedMove.split("-");
 
   return parseInt(proposedSize) > parseInt(existingSize);

@@ -1,12 +1,13 @@
-import React, { Component, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+import styled from "styled-components";
+import { isMoveLegal } from "../../common/src/is-move-legal";
 import {
-  allPlayerPieces,
   GameSnapshot,
   initialGameState,
   Player,
   PlayerPiece,
 } from "../../common/src/model";
-import { isMoveLegal } from "../../common/src/is-move-legal";
 import {
   ClientCommand,
   ClientMessage,
@@ -15,9 +16,8 @@ import {
   ServerMessage,
 } from "../../common/src/transfer";
 import "./Game.css";
-import { ReactComponent as X } from "./X.svg";
 import { ReactComponent as O } from "./O.svg";
-import { useParams } from "react-router-dom";
+import { ReactComponent as X } from "./X.svg";
 
 // const SERVER_SPEC = "35.188.94.49:8080";
 const SERVER_SPEC = "localhost:8080";
@@ -26,6 +26,24 @@ interface SquareProps {
   value: string;
   onClick: () => void;
 }
+
+const StyledButton = styled.button`
+  background: #fff;
+  border: 1px solid #999;
+  float: left;
+  font-size: 24px;
+  font-weight: bold;
+  line-height: 34px;
+  height: 100%;
+  margin-right: -1px;
+  margin-top: -1px;
+  padding: 0;
+  text-align: center;
+  width: 33%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+`;
 
 function Square(props: SquareProps) {
   let contents: any = "";
@@ -38,11 +56,7 @@ function Square(props: SquareProps) {
         <O className={`size-${size}`} />
       );
   }
-  return (
-    <button className="square" onClick={props.onClick}>
-      {contents}
-    </button>
-  );
+  return <StyledButton onClick={props.onClick}>{contents}</StyledButton>;
 }
 
 interface BoardProps {
@@ -106,21 +120,21 @@ function Game() {
       webby.onmessage = (event) => {
         console.log(event);
         const msg: ServerMessage = JSON.parse(event.data);
-        if (msg.cmd) {
-          switch (msg.cmd) {
-            case ServerCommand.board:
-              const newBoardState = msg.payload.board;
-              setHistory(history.concat([newBoardState]));
-              setCurrentMove(currentMoveIdx + 1);
-              break;
-            case ServerCommand.history:
-              setHistory(msg.payload.history);
-              setCurrentMove(msg.payload.history.length - 1);
-              break;
-            case ServerCommand.player:
-              setMyPlayer(msg.payload.player);
-              break;
-          }
+        switch (msg.cmd) {
+          case ServerCommand.board:
+            const newBoardState = msg.payload.board;
+            setHistory(history.concat([newBoardState]));
+            setCurrentMove(currentMoveIdx + 1);
+            break;
+          case ServerCommand.history:
+            setHistory(msg.payload.history);
+            setCurrentMove(msg.payload.history.length - 1);
+            break;
+          case ServerCommand.player:
+            setMyPlayer(msg.payload.player);
+            break;
+          default:
+            console.warn(`Unknown Command: ${(msg as any).cmd}`);
         }
       };
       setWS(webby);
