@@ -1,5 +1,12 @@
-import React, { Component } from "react";
-import { allPlayerPieces, GameSnapshot, initialGameState, Player, PlayerPiece } from "../../common/src/model";
+import React, { Component, useEffect, useState } from "react";
+import {
+  allPlayerPieces,
+  GameSnapshot,
+  initialGameState,
+  Player,
+  PlayerPiece,
+} from "../../common/src/model";
+import { isMoveLegal } from "../../common/src/is-move-legal";
 import {
   ClientCommand,
   ClientMessage,
@@ -8,11 +15,12 @@ import {
   ServerMessage,
 } from "../../common/src/transfer";
 import "./Game.css";
-import {ReactComponent as X} from "./X.svg";
-import {ReactComponent as O} from "./O.svg";
+import { ReactComponent as X } from "./X.svg";
+import { ReactComponent as O } from "./O.svg";
+import { useParams } from "react-router-dom";
 
-const SERVER_SPEC = "35.188.94.49:8080";
-// const SERVER_SPEC = "localhost:8080";
+// const SERVER_SPEC = "35.188.94.49:8080";
+const SERVER_SPEC = "localhost:8080";
 
 interface SquareProps {
   value: string;
@@ -22,8 +30,13 @@ interface SquareProps {
 function Square(props: SquareProps) {
   let contents: any = "";
   if (props.value) {
-    const [player, size, id] = props.value.split("-");
-    contents = player === "X" ? <X className={`size-${size}`} /> : <O className={`size-${size}`}/>;
+    const [player, size] = props.value.split("-");
+    contents =
+      player === "X" ? (
+        <X className={`size-${size}`} />
+      ) : (
+        <O className={`size-${size}`} />
+      );
   }
   return (
     <button className="square" onClick={props.onClick}>
@@ -34,41 +47,35 @@ function Square(props: SquareProps) {
 
 interface BoardProps {
   squares: string[];
-  xIsNext: boolean;
   squareClick: (arg: number) => void;
 }
 
-class Board extends Component<BoardProps, {}> {
-  renderSquare(i: number) {
+function Board(props: BoardProps) {
+  const renderSquare = (i: number) => {
     return (
-      <Square
-        value={this.props.squares[i]}
-        onClick={() => this.props.squareClick(i)}
-      />
+      <Square value={props.squares[i]} onClick={() => props.squareClick(i)} />
     );
-  }
+  };
 
-  render() {
-    return (
-      <div className="board-grid">
-        <div className="board-row">
-          {this.renderSquare(0)}
-          {this.renderSquare(1)}
-          {this.renderSquare(2)}
-        </div>
-        <div className="board-row">
-          {this.renderSquare(3)}
-          {this.renderSquare(4)}
-          {this.renderSquare(5)}
-        </div>
-        <div className="board-row">
-          {this.renderSquare(6)}
-          {this.renderSquare(7)}
-          {this.renderSquare(8)}
-        </div>
+  return (
+    <div className="board-grid">
+      <div className="board-row">
+        {renderSquare(0)}
+        {renderSquare(1)}
+        {renderSquare(2)}
       </div>
-    );
-  }
+      <div className="board-row">
+        {renderSquare(3)}
+        {renderSquare(4)}
+        {renderSquare(5)}
+      </div>
+      <div className="board-row">
+        {renderSquare(6)}
+        {renderSquare(7)}
+        {renderSquare(8)}
+      </div>
+    </div>
+  );
 }
 
 interface GameState {
@@ -79,37 +86,22 @@ interface GameState {
   selectedMove: PlayerPiece | null;
 }
 
-interface GameProps {
-  match: { params: { gameId: string } };
-}
+function Game() {
+  const [history, setHistory] = useState([initialGameState()]);
+  const [currentMoveIdx, setCurrentMove] = useState(0);
+  const [myPlayer, setMyPlayer] = useState<Player | null>(null);
+  const [selectedPiece, setSelectedPiece] = useState<PlayerPiece | null>(null);
+  const [ws, setWS] = useState<WebSocket | null>(null);
+  const { gameId } = useParams<{ gameId: string }>();
 
-class Game extends Component<GameProps, GameState> {
-  constructor(props: GameProps) {
-    super(props);
-
-    this.state = {
-      history: [
-        initialGameState(),
-      ],
-      currentMoveIdx: 0,
-      ws: null,
-      myPlayer: null,
-      selectedMove: null,
-    };
-
-    this.handleClick = this.handleClick.bind(this);
-  }
-
-  componentDidMount() {
-    const gameId = this.props.match.params.gameId;
-
+  useEffect(() => {
     (gameId === "new"
       ? fetch(`http://${SERVER_SPEC}/api/new_room`)
           .then((response) => response.json())
           .then((data: CreateRoomResp) => data.roomId)
       : Promise.resolve(gameId)
     ).then((gameId) => {
-      window.history.replaceState(null, "Game", `/g/${gameId}`)
+      window.history.replaceState(null, "Game", `/g/${gameId}`);
       const webby = new WebSocket(`ws://${SERVER_SPEC}/api/connect/${gameId}`);
       webby.onmessage = (event) => {
         console.log(event);
@@ -118,143 +110,136 @@ class Game extends Component<GameProps, GameState> {
           switch (msg.cmd) {
             case ServerCommand.board:
               const newBoardState = msg.payload.board;
-              this.setState({
-                history: this.state.history.concat([
-                  newBoardState
-                ]),
-                currentMoveIdx: this.state.currentMoveIdx + 1,
-              });
+              setHistory(history.concat([newBoardState]));
+              setCurrentMove(currentMoveIdx + 1);
               break;
             case ServerCommand.history:
-              this.setState({
-                history: msg.payload.history,
-                currentMoveIdx: msg.payload.history.length - 1,
-              });
+              setHistory(msg.payload.history);
+              setCurrentMove(msg.payload.history.length - 1);
               break;
             case ServerCommand.player:
-              this.setState({
-                myPlayer: msg.payload.player,
-              })
+              setMyPlayer(msg.payload.player);
+              break;
           }
         }
       };
-      this.setState({ ws: webby });
+      setWS(webby);
     });
-  }
+  }, []);
 
-  get currentBoardState(): GameSnapshot {
-    return this.state.history[this.state.currentMoveIdx];
-  }
+  const gameState = history[currentMoveIdx];
 
-  isMovePossible(currentValue: string, proposedMove: PlayerPiece): boolean {
-    if (!currentValue) {
-      return true;
-    }
-    const [existingPlayer, existingSize] = currentValue.split("-");
-    const [proposedSize] = proposedMove.split("-");
-
-    // even if the size is larger we won't let you play over your own piece because that's dumb.
-    if (existingPlayer === this.state.myPlayer) {
-      return false;
-    }
-
-    return (parseInt(proposedSize) > parseInt(existingSize));
-  }
-
-  handleClick(i: number) {
-    // Users are not allowed to modify the past (see grandfather paradox).
-    // TODO: warn users when no move is selected
-    if (this.state.currentMoveIdx !== this.state.history.length - 1 ||
-
+  const handleClick = (i: number) => {
+    if (
+      // Users are not allowed to modify the past (see grandfather paradox).
+      currentMoveIdx !== history.length - 1 ||
       // it's the other players turn
-      this.currentBoardState.playersTurn !== this.state.myPlayer || 
-
+      gameState.playersTurn !== myPlayer ||
       // the player hasn't selected a piece
-      !this.state.selectedMove ||
-
+      // TODO: warn users when no move is selected
+      !selectedPiece ||
       // there's a winner
-      this.currentBoardState.winner ||
-
-      // the person is a spectator
-      !this.state.myPlayer 
-      ) {
+      gameState.winner
+    ) {
       return false;
     }
 
-    if (this.isMovePossible(this.currentBoardState.board[i], this.state.selectedMove)) {
-      if (this.state.ws) {
-        const clientMsg: ClientMessage = {cmd: ClientCommand.move, payload: { playerMove: {location: i, player: this.currentBoardState.playersTurn, piece: this.state.selectedMove} }}
-        this.state.ws.send(JSON.stringify(clientMsg));
-        
-        this.setState({
-          selectedMove: null,
-        });
+    if (isMoveLegal(gameState.board[i], selectedPiece)) {
+      if (ws) {
+        const clientMsg: ClientMessage = {
+          cmd: ClientCommand.move,
+          payload: {
+            playerMove: {
+              location: i,
+              player: gameState.playersTurn,
+              piece: selectedPiece,
+            },
+          },
+        };
+        ws.send(JSON.stringify(clientMsg));
+
+        setSelectedPiece(null);
       }
     }
+  };
+
+  function getPlayerIndicator(player: string) {
+    return <span className={`${player} indicator`}></span>;
   }
 
-  jumpTo(moveNum: number) {
-    this.setState({
-      currentMoveIdx: moveNum,
-    });
-  }
-
-  getPlayerIndicator(player: string) {
-    return <span className={`${player} indicator`}></span>
-  }
-
-  render() {
-    let status;
-    if (this.currentBoardState.winner) {
-      status = <span><span>Winner:</span> {this.getPlayerIndicator(this.currentBoardState.winner[0])}</span>;
-    } else {
-      status = <span><span>Next player:</span>{this.getPlayerIndicator(this.currentBoardState.playersTurn)}</span>;
-    }
-
-    const moves = this.state.history.map((step, move) => {
-      const desc = move ? "Go to move #" + move : "Go to game start";
-      return (
-        <li key={move}>
-          <button onClick={() => this.jumpTo(move)}>{desc}</button>
-        </li>
-      );
-    });
-
-    const moveOptions = (this.state.myPlayer === Player.X ? this.currentBoardState.remainingPiecesX : this.currentBoardState.remainingPiecesO).map((move) => {
-      const [size] = (move as string).split("-");
-      const classes = ["piece-square"];
-      if (this.state.selectedMove === move) {
-        classes.push("selected")
-      }
-      return (
-        <div className={classes.join(" ")} key={move} onClick={()=>{ this.setState({selectedMove: move})}}>
-          {this.state.myPlayer === Player.X ? <X className={`size-${size}`} /> : <O className={`size-${size}`}/>}
-        </div>
-      );
-    });
-
-    return (
-      <div className="game">
-        <div className="game-board">
-          <Board
-            squares={this.currentBoardState.board}
-            xIsNext={this.currentBoardState.playersTurn === Player.X}
-            squareClick={this.handleClick}
-          />
-          <div>
-            <div>{status}</div>
-            {this.state.myPlayer ? (<div><div>Your Remaining Pieces:</div>
-            <div className="move-option-row">
-              {moveOptions}
-            </div></div>): <div></div>}
-          </div>
-        </div>
-        {/* <div className="game-info">
-          <ol>{moves}</ol>
-        </div> */}
-      </div>
+  let status;
+  if (gameState.winner) {
+    status = (
+      <span>
+        <span>Winner:</span> {getPlayerIndicator(gameState.winner[0])}
+      </span>
+    );
+  } else {
+    status = (
+      <span>
+        <span>Next player:</span>
+        {getPlayerIndicator(gameState.playersTurn)}
+      </span>
     );
   }
+
+  const moves = history.map((step, move) => {
+    const desc = move ? "Go to move #" + move : "Go to game start";
+    return (
+      <li key={move}>
+        <button onClick={() => setCurrentMove(move)}>{desc}</button>
+      </li>
+    );
+  });
+
+  const moveOptions = (
+    myPlayer === Player.X
+      ? gameState.remainingPiecesX
+      : gameState.remainingPiecesO
+  ).map((move) => {
+    const [size] = (move as string).split("-");
+    const classes = ["piece-square"];
+    if (selectedPiece === move) {
+      classes.push("selected");
+    }
+    return (
+      <div
+        className={classes.join(" ")}
+        key={move}
+        onClick={() => {
+          setSelectedPiece(move);
+        }}
+      >
+        {myPlayer === Player.X ? (
+          <X className={`size-${size}`} />
+        ) : (
+          <O className={`size-${size}`} />
+        )}
+      </div>
+    );
+  });
+
+  return (
+    <div className="game">
+      <div className="game-board">
+        <Board squares={gameState.board} squareClick={handleClick} />
+        <div>
+          <div>{status}</div>
+          {myPlayer ? (
+            <div>
+              <div>Your Remaining Pieces:</div>
+              <div className="move-option-row">{moveOptions}</div>
+            </div>
+          ) : (
+            <div></div>
+          )}
+        </div>
+      </div>
+      {/* <div className="game-info">
+          <ol>{moves}</ol>
+        </div> */}
+    </div>
+  );
 }
 
 // ========================================
