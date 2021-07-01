@@ -15,6 +15,8 @@ import {
   ServerCommand,
   ServerMessage,
 } from "../../common/src/transfer";
+import { useAppDispatch, useAppSelector } from "./app/hooks";
+import { board, selectHistory } from "./app/store";
 import "./Game.css";
 import { ReactComponent as O } from "./O.svg";
 import { ReactComponent as X } from "./X.svg";
@@ -102,6 +104,8 @@ interface GameState {
 
 function Game() {
   const [history, setHistory] = useState([initialGameState()]);
+  const storeHistory = useAppSelector(selectHistory);
+  const dispatch = useAppDispatch();
   const [currentMoveIdx, setCurrentMove] = useState(0);
   const [myPlayer, setMyPlayer] = useState<Player | null>(null);
   const [selectedPiece, setSelectedPiece] = useState<PlayerPiece | null>(null);
@@ -124,6 +128,7 @@ function Game() {
           case ServerCommand.board:
             const newBoardState = msg.payload.board;
             setHistory(history.concat([newBoardState]));
+            dispatch(board(newBoardState));
             setCurrentMove(currentMoveIdx + 1);
             break;
           case ServerCommand.history:
