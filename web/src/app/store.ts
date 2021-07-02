@@ -33,20 +33,26 @@ export const gameSlice = createSlice({
     board: (state, action: PayloadAction<GameSnapshot>) => {
       state.history = [...state.history, action.payload];
     },
+    history: (state, action: PayloadAction<GameSnapshot[]>) => {
+      state.history = action.payload;
+    },
     clear: (state) => {
       state.history = [initialGameState()];
     },
   },
 });
 
-export const { move, board, clear } = gameSlice.actions;
+export const { move, board, clear, history } = gameSlice.actions;
 
 function* incrementAsync() {
   console.log("Incrementing async...");
 }
 
 function* watchIncrementAsync() {
-  yield takeEvery(board.type, incrementAsync);
+  yield all([
+    takeEvery(board.type, incrementAsync),
+    takeEvery(history.type, incrementAsync),
+  ]);
 }
 
 // notice how we now only export the rootSaga

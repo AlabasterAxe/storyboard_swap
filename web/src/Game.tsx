@@ -16,7 +16,7 @@ import {
   ServerMessage,
 } from "../../common/src/transfer";
 import { useAppDispatch, useAppSelector } from "./app/hooks";
-import { board, selectHistory } from "./app/store";
+import { board, history, selectHistory } from "./app/store";
 import "./Game.css";
 import { ReactComponent as O } from "./O.svg";
 import { ReactComponent as X } from "./X.svg";
@@ -103,7 +103,6 @@ interface GameState {
 }
 
 function Game() {
-  const [history, setHistory] = useState([initialGameState()]);
   const storeHistory = useAppSelector(selectHistory);
   const dispatch = useAppDispatch();
   const [currentMoveIdx, setCurrentMove] = useState(0);
@@ -127,12 +126,11 @@ function Game() {
         switch (msg.cmd) {
           case ServerCommand.board:
             const newBoardState = msg.payload.board;
-            setHistory(history.concat([newBoardState]));
             dispatch(board(newBoardState));
             setCurrentMove(currentMoveIdx + 1);
             break;
           case ServerCommand.history:
-            setHistory(msg.payload.history);
+            dispatch(history(msg.payload.history));
             setCurrentMove(msg.payload.history.length - 1);
             break;
           case ServerCommand.player:
@@ -146,12 +144,12 @@ function Game() {
     });
   }, []);
 
-  const gameState = history[currentMoveIdx];
+  const gameState: GameSnapshot = storeHistory[currentMoveIdx];
 
   const handleClick = (i: number) => {
     if (
       // Users are not allowed to modify the past (see grandfather paradox).
-      currentMoveIdx !== history.length - 1 ||
+      currentMoveIdx !== storeHistory.length - 1 ||
       // it's the other players turn
       gameState.playersTurn !== myPlayer ||
       // the player hasn't selected a piece
@@ -202,7 +200,7 @@ function Game() {
     );
   }
 
-  const moves = history.map((step, move) => {
+  const moves = (storeHistory as GameSnapshot[]).map((step, move) => {
     const desc = move ? "Go to move #" + move : "Go to game start";
     return (
       <li key={move}>
