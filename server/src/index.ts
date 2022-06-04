@@ -2,17 +2,15 @@ import Boom from "@hapi/boom";
 import Hapi from "@hapi/hapi";
 import { v4 as uuidv4 } from "uuid";
 import * as WebSocket from "ws";
-import { initialGameState, Player, Room } from "../../common/src/model";
-import { calculateWinner } from "../../common/src/calculate-winner";
+import { initialGameState, Player, PlayerState, Room } from "../../common/src/model";
 import {
-  BoardPayload,
   ClientCommand,
   ClientMessage,
   CreateRoomResp,
-  HistoryMessage,
-  HistoryPayload,
   PlayerPayload,
   ServerCommand,
+  StateMessage,
+  StatePayload,
 } from "../../common/src/transfer";
 
 const rooms = new Map<string, Room>();
@@ -74,28 +72,34 @@ const init = async () => {
 
       if (initially) {
         const roomId = request.params.roomId;
-        let player: Player | null = null;
+        // todo validate project url
+        const projectUrl = request.params.projectUrl;
         const room = rooms.get(roomId);
+        const playerId = uuidv4();
         if (room) {
           room.participants.push(ws);
-          if (room.participants.length == 1) {
-            player = Player.X;
-          } else if (room.participants.length == 2) {
-            player = Player.O;
-          }
 
-          const historyMessage: HistoryMessage = {
-            cmd: ServerCommand.history,
+          room.participantPlayerMap[ws.id] = playerId;
+
+          const stateMessage: StateMessage = {
+            cmd: ServerCommand.state,
             payload: {
-              history: room.history,
+              state: room.history.slice(-1)[0],
             },
           };
-          ws.send(JSON.stringify(historyMessage));
+          ws.send(JSON.stringify(stateMessage));
         }
+
+        let player: Player = {
+          id: playerId,
+          state: PlayerState.ready,
+          originalProjectUrl: projectUrl,
+          pendingProjectUrls: [projectUrl]
+        };
 
         ctx.roomId = roomId;
         const payload: PlayerPayload = {
-          player,
+          player
         };
         ws.send(JSON.stringify({ cmd: ServerCommand.player, payload }));
 
@@ -110,43 +114,28 @@ const init = async () => {
         return Boom.badRequest("must supply cmd field on req object");
       }
       switch (message.cmd) {
-        case ClientCommand.move:
+        case ClientCommand.done:
           const room = rooms.get(ctx.roomId);
 
           if (room) {
-            const peers = room.participants;
-            const newSnapshot = { ...room.history[room.history.length - 1] };
-            newSnapshot.board[
-              message.payload.playerMove.location
-            ] = `${message.payload.playerMove.player}-${message.payload.playerMove.piece}`;
-            newSnapshot.winner = calculateWinner(newSnapshot.board);
-            newSnapshot.playersTurn =
-              newSnapshot.playersTurn === Player.X ? Player.O : Player.X;
-            newSnapshot.previousMove = message.payload.playerMove;
-            if (message.payload.playerMove.player === Player.X) {
-              const newRemainingPieces = [...newSnapshot.remainingPiecesX];
-              newRemainingPieces.splice(
-                newRemainingPieces.indexOf(message.payload.playerMove.piece),
-                1
-              );
-              newSnapshot.remainingPiecesX = newRemainingPieces;
-            } else {
-              const newRemainingPieces = [...newSnapshot.remainingPiecesO];
-              newRemainingPieces.splice(
-                newRemainingPieces.indexOf(message.payload.playerMove.piece),
-                1
-              );
-              newSnapshot.remainingPiecesO = newRemainingPieces;
-            }
+            const playerId = room.participantPlayerMap[ws.id];
+            const latestSnapshot = room.history[room.history.length - 1];
+            const player = latestSnapshot.players[playerId];
+            const nextPlayerId = latestSnapshot.playerRecipientMap[playerId];
+            const nextPlayer = latestSnapshot.players[nextPlayerId];
+            const completedUrl = message.payload.projectUrl;
+            const newPlayer = {...player, pendingProjectUrls: player.pendingProjectUrls.filter(url => url !== completedUrl)};
+            const newNextPlayer = {...nextPlayer, pendingProjectUrls: [...nextPlayer.pendingProjectUrls, completedUrl]};
+            const newSnapshot = { ...latestSnapshot, players: { ...latestSnapshot.players, [playerId]: newPlayer, [nextPlayerId]: newNextPlayer} };
 
             room.history.push(newSnapshot);
-            peers.forEach((peer: any) => {
-              const msgPayload: BoardPayload = {
-                board: newSnapshot,
+            room.participants.forEach((peer: any) => {
+              const msgPayload: StatePayload = {
+                state: newSnapshot,
               };
               peer.send(
                 JSON.stringify({
-                  cmd: ServerCommand.board,
+                  cmd: ServerCommand.state,
                   payload: msgPayload,
                 })
               );
@@ -170,6 +159,7 @@ const init = async () => {
         id: uuidv4(),
         participants: [],
         history: [initialGameState()],
+        participantPlayerMap: {},
       };
       rooms.set(newRoom.id, newRoom);
 

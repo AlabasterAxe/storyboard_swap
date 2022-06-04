@@ -1,13 +1,9 @@
 
-export type Participant = {
-  id: string;
-  projectUrl: string;
-}
-
 export interface Room {
   id: string;
-  participants: Participant[];
+  participants: any[];
   history: GameSnapshot[];
+  participantPlayerMap: Record<string, string>;
 }
 
 export enum PlayerState {
@@ -23,21 +19,29 @@ export enum GameState {
 
 export type Player = {
   id: string;
-  participantId: string;
   state: PlayerState;
+  originalProjectUrl: string;
+
+  pendingProjectUrls: string[];
 }
 
 export interface GameSnapshot {
   state: GameState;
   round: number;
-  playerOrder: string[];
+
+  // simple map so that when a user indicates done
+  // we can trivially know which player to send the
+  // next url to.
+  playerRecipientMap: Record<string, string>;
+  players: Record<string, Player>;
 }
 
 export function initialGameState(): GameSnapshot {
   return {
     state: GameState.not_started,
     round: 0,
-    playerOrder: undefined,
+    players: {},
+    playerRecipientMap: {},
   };
 }
 
