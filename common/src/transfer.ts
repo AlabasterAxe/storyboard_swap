@@ -1,4 +1,4 @@
-import { GameSnapshot, Player, PlayerMove, PlayerPiece } from "./model";
+import { GameSnapshot, Player } from "./model";
 
 export interface CreateRoomRqst {}
 
@@ -11,30 +11,18 @@ export interface ConnectRqst {
 }
 
 export enum ClientCommand {
-  move = "MOVE",
+  done = "done",
 }
 
 export enum ServerCommand {
-  // sends the current board to the player
-  board = "BOARD",
+  // sends the next url to the player
+  url = "URL",
 
-  // sends the whole history of the board
-  history = "HISTORY",
-
-  // sends the which player they are
   player = "PLAYER",
 }
 
-export interface MovePayload {
-  playerMove: PlayerMove;
-}
-
-export interface BoardPayload {
-  board: GameSnapshot;
-}
-
-export interface HistoryPayload {
-  history: GameSnapshot[];
+export interface UrlPayload {
+  url: string;
 }
 
 export interface PlayerPayload {
@@ -43,17 +31,16 @@ export interface PlayerPayload {
 
 export interface ClientMessage {
   cmd: ClientCommand;
-  payload: MovePayload;
 }
 
 interface ServerMessageBase {
   cmd: ServerCommand;
-  payload: BoardPayload | PlayerPayload | HistoryPayload;
+  payload: UrlPayload | PlayerPayload;
 }
 
-export interface BoardMessage extends ServerMessageBase {
-  cmd: ServerCommand.board;
-  payload: BoardPayload;
+export interface UrlMessage extends ServerMessageBase {
+  cmd: ServerCommand.url;
+  payload: UrlPayload;
 }
 
 export interface PlayerMessage extends ServerMessageBase {
@@ -61,9 +48,4 @@ export interface PlayerMessage extends ServerMessageBase {
   payload: PlayerPayload;
 }
 
-export interface HistoryMessage extends ServerMessageBase {
-  cmd: ServerCommand.history;
-  payload: HistoryPayload;
-}
-
-export type ServerMessage = BoardMessage | PlayerMessage | HistoryMessage;
+export type ServerMessage = UrlMessage | PlayerMessage;
