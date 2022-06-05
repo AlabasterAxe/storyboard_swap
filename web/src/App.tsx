@@ -1,11 +1,19 @@
-import React, { Component, lazy, Suspense } from "react";
+import React, { Component, lazy, Suspense, useState } from "react";
 import { BrowserRouter, Route, Link, Switch } from "react-router-dom";
 import "./App.css";
 
 const Game = lazy(() => import("./Game"));
 
 function Home() {
-  return <Link to="/g/new">Start Game</Link>;
+  const [roomName, setRoomName] = useState<string>("");
+  const [projectUrl, setProjectUrl] = useState<string>("");
+  return (<div className="contentColumn">
+    <div>Room Name</div>
+    <input onChange={(e)=>{setRoomName(e.target.value)}}/>
+    <div>Project Url</div>
+    <input onChange={(e)=>{setProjectUrl(e.target.value)}}/>
+    <Link to={"/g/" + roomName || "new"}>Start Game</Link>
+  </div>);
 }
 
 class App extends Component<{}, {}> {

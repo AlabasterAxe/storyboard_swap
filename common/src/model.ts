@@ -17,7 +17,7 @@ export enum GameState {
   completed,
 };
 
-export type Player = {
+export interface Player {
   id: string;
   state: PlayerState;
   originalProjectUrl: string;
