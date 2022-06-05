@@ -58,7 +58,7 @@ function Game() {
   }, []);
 
   let body = <div>Loading...</div>;
-  if (currentPlayer && currentPlayer.roomId !== gameId) {
+  if (!currentPlayer || currentPlayer.roomId !== gameId) {
     body = (
       <>
         <div>Create a project and paste the URL here to join:</div>
