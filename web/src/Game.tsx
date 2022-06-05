@@ -16,7 +16,7 @@ import {
 } from "./app/store";
 import "./Game.css";
 
-const SERVER_SPEC = process.env.NODE_ENV === "development" ? "localhost:8080" : "http://example.com";
+const SERVER_SPEC = process.env.NODE_ENV === "development" ? "localhost:8080" : "https://storyboardswap.com";
 
 function Game() {
   const dispatch = useAppDispatch();
