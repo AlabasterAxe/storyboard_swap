@@ -5,14 +5,18 @@ import {
   ClientCommand,
   CreateRoomResp,
   ServerCommand,
-  ServerMessage
+  ServerMessage,
 } from "../../common/src/transfer";
 import { useAppDispatch, useAppSelector } from "./app/hooks";
-import { player, selectCurrentGameState, selectPlayer, state } from "./app/store";
+import {
+  player,
+  selectCurrentGameState,
+  selectPlayer,
+  state,
+} from "./app/store";
 import "./Game.css";
 
-// const SERVER_SPEC = "35.188.94.49:8080";
-const SERVER_SPEC = "localhost:8080";
+const SERVER_SPEC = process.env.NODE_ENV === "development" ? "localhost:8080" : "http://example.com";
 
 function Game() {
   const dispatch = useAppDispatch();
@@ -30,14 +34,6 @@ function Game() {
     ).then((gameId) => {
       window.history.replaceState(null, "Game", `/g/${gameId}`);
       const webby = new WebSocket(`ws://${SERVER_SPEC}/api/connect/${gameId}`);
-      webby.onopen = () => {
-        webby.send(JSON.stringify({
-          cmd: ClientCommand.join,
-          payload: {
-            player: currentPlayer
-          }
-        }));
-      }
       webby.onmessage = (event) => {
         console.log(event);
         const msg: ServerMessage = JSON.parse(event.data);
@@ -52,49 +48,104 @@ function Game() {
             console.warn(`Unknown Command: ${(msg as any).cmd}`);
         }
       };
-      
+
       setWs(webby);
     });
   }, []);
 
   let body = <div>Loading...</div>;
-  switch (currentGameState.state) {
-    case GameState.not_started: 
-      body = <>
-        <span>Waiting for players to join. Click Start once everybody is in.</span>
-        <button onClick={()=>ws?.send(JSON.stringify({cmd: ClientCommand.start}))}>Start</button>
-      </>;
-      break;
-    case GameState.in_progress: 
-      if (currentPlayer?.pendingProjectUrls && currentPlayer.pendingProjectUrls.length > 0) {
-        body = (<>
-          <span>Add your magic to this project and then come back and click "Done"</span>
-          <button onClick={()=>{
-            if (currentPlayer?.pendingProjectUrls && currentPlayer.pendingProjectUrls.length > 0) {
-              ws?.send(JSON.stringify({
-                cmd: ClientCommand.done, payload: {
-                  projectUrl: currentPlayer.pendingProjectUrls[0]
-                }
-              }));
-            }
-          }}>Done</button>
-        </>);
-      } else {
-        body = <>
-          <span>Waiting for your project.</span>
-        </>;
-      }
-      
+  if (currentPlayer && currentPlayer.roomId !== gameId) {
+    body = (
+      <>
+        <div>Create a project and paste the URL here to join:</div>
+        <input
+          value={currentPlayer?.originalProjectUrl ?? ""}
+          onChange={(e) => {
+            dispatch(player({ originalProjectUrl: e.target.value }));
+          }}
+        />
+        <button onClick={()=>{
+          if (ws) {
+            ws.send(
+              JSON.stringify({
+                cmd: ClientCommand.join,
+                payload: {
+                  player: currentPlayer,
+                },
+              })
+            );
+          }
+        }}>Join</button>
+      </>
+    );
+  } else {
+    switch (currentGameState.state) {
+      case GameState.not_started:
+        body = (
+          <>
+            <span>
+              Waiting for players to join. Click Start once everybody is in.
+            </span>
+            <button
+              onClick={() =>
+                ws?.send(JSON.stringify({ cmd: ClientCommand.start }))
+              }
+            >
+              Start
+            </button>
+          </>
+        );
+        break;
+      case GameState.in_progress:
+        if (
+          currentPlayer?.pendingProjectUrls &&
+          currentPlayer.pendingProjectUrls.length > 0
+        ) {
+          body = (
+            <>
+              <span>
+                Add your magic to this project and then come back and click
+                "Done"
+              </span>
+              <button
+                onClick={() => {
+                  if (
+                    currentPlayer?.pendingProjectUrls &&
+                    currentPlayer.pendingProjectUrls.length > 0
+                  ) {
+                    ws?.send(
+                      JSON.stringify({
+                        cmd: ClientCommand.done,
+                        payload: {
+                          projectUrl: currentPlayer.pendingProjectUrls[0],
+                        },
+                      })
+                    );
+                  }
+                }}
+              >
+                Done
+              </button>
+            </>
+          );
+        } else {
+          body = (
+            <>
+              <span>Waiting for your project.</span>
+            </>
+          );
+        }
+    }
   }
 
   return (
     <div className="game">
       <div className="game-board">
         <div>
-          <div className="debug-info">
+          {process.env.NODE_ENV === "development" && <div className="debug-info">
             <div>{JSON.stringify(currentGameState)}</div>
             <div>{JSON.stringify(currentPlayer)}</div>
-          </div>
+          </div>}
           <div>{body}</div>
         </div>
       </div>

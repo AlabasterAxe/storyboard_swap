@@ -18,6 +18,14 @@ import {
   StateMessage,
   StatePayload,
 } from "../../common/src/transfer";
+import dotenv from 'dotenv';
+      
+dotenv.config();
+
+if (!process.env.ENVIRONMENT) {
+  console.error('no ENVIRONMENT provided!');
+  process.exit(1);
+}
 
 const rooms = new Map<string, Room>();
 
@@ -25,8 +33,9 @@ const STATIC_ROOT = "../web/build";
 
 // generates a new player but without the originalProjectUrl since that has to come from the
 // client
-function newPlayer(originalProjectUrl: string): Player {
+function newPlayer(roomId: string, originalProjectUrl: string): Player {
   return {
+    roomId,
     id: uuidv4(),
     state: PlayerState.ready,
     pendingProjectUrls: [originalProjectUrl],
@@ -132,8 +141,8 @@ const init = async () => {
             // we initialize a new player assigned to their own project url but we defer to the provided
             // client fields if they exist.
             let player: Player = {
-              ...newPlayer(clientPlayer.originalProjectUrl),
-              ...clientPlayer,
+              ...newPlayer(room.id, clientPlayer.originalProjectUrl),
+              ...(clientPlayer.roomId === room.id ? clientPlayer : {}),
             };
 
             room.participantPlayerMap[ctx.id] = player.id;
