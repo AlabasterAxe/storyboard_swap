@@ -7,14 +7,14 @@ export interface Room {
 }
 
 export enum PlayerState {
-  ready,
-  working,
+  ready = "ready",
+  working = "working",
 };
 
 export enum GameState {
-  not_started,
-  in_progress,
-  completed,
+  not_started = "not_started",
+  in_progress = "in_progress",
+  completed = "completed",
 };
 
 export interface Player {

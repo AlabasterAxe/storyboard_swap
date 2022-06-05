@@ -29,6 +29,14 @@ function Game() {
     ).then((gameId) => {
       window.history.replaceState(null, "Game", `/g/${gameId}`);
       const webby = new WebSocket(`ws://${SERVER_SPEC}/api/connect/${gameId}`);
+      webby.onopen = () => {
+        webby.send(JSON.stringify({
+          cmd: ClientCommand.join,
+          payload: {
+            player: currentPlayer
+          }
+        }));
+      }
       webby.onmessage = (event) => {
         console.log(event);
         const msg: ServerMessage = JSON.parse(event.data);
@@ -43,12 +51,7 @@ function Game() {
             console.warn(`Unknown Command: ${(msg as any).cmd}`);
         }
       };
-      webby.send(JSON.stringify({
-        cmd: ClientCommand.join,
-        payload: {
-          player: currentPlayer
-        }
-      }));
+      
       setWs(webby);
     });
   }, [dispatch, gameId]);

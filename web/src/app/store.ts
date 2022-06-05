@@ -2,7 +2,6 @@ import {
   ClientPlayer,
   GameSnapshot,
   initialGameState,
-  Player,
 } from "../../../common/src/model";
 import {
   configureStore,

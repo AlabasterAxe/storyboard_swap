@@ -66,6 +66,7 @@ const init = async () => {
               }
             }, 5000);
             console.log("player connected");
+            blah.ctx.id = uuidv4();
           },
           disconnect: (blah: any) => {
             if (blah.ctx.to) {
@@ -75,6 +76,7 @@ const init = async () => {
             if (blah.ctx.roomId) {
               const room = rooms.get(blah.ctx.roomId);
               if (room) {
+                delete room.participantPlayerMap[blah.ctx.id];
                 room.participants.splice(room.participants.indexOf(blah.ws), 1);
               }
             }
@@ -88,21 +90,28 @@ const init = async () => {
 
       if (initially) {
         const roomId = request.params.roomId;
-        // todo validate project url
-        const projectUrl = request.params.projectUrl;
-        const room = rooms.get(roomId);
-        const playerId = uuidv4();
-        if (room) {
-          room.participants.push(ws);
 
-          const stateMessage: StateMessage = {
-            cmd: ServerCommand.state,
-            payload: {
-              state: room.history.slice(-1)[0],
-            },
+        let room: Room | undefined = rooms.get(roomId);
+        if (!room) {
+          room = {
+            id: roomId,
+            participants: [],
+            history: [initialGameState()],
+            participantPlayerMap: {},
           };
-          ws.send(JSON.stringify(stateMessage));
+          rooms.set(room.id, room);
         }
+
+        room.participants.push(ws);
+
+        ctx.roomId = roomId;
+        const stateMessage: StateMessage = {
+          cmd: ServerCommand.state,
+          payload: {
+            state: room.history.slice(-1)[0],
+          },
+        };
+        ws.send(JSON.stringify(stateMessage));
 
         return "";
       }
@@ -124,6 +133,8 @@ const init = async () => {
               ...clientPlayer,
             };
 
+            room.participantPlayerMap[ctx.id] = player.id;
+
             ws.send(
               JSON.stringify({ cmd: ServerCommand.player, payload: { player } })
             );
@@ -132,7 +143,7 @@ const init = async () => {
           return "";
         case ClientCommand.done:
           if (room) {
-            const playerId = room.participantPlayerMap[ws.id];
+            const playerId = room.participantPlayerMap[ctx.id];
             const latestSnapshot = room.history[room.history.length - 1];
             const player = latestSnapshot.players[playerId];
             const nextPlayerId = latestSnapshot.playerRecipientMap[playerId];
@@ -177,29 +188,6 @@ const init = async () => {
         default:
           return Boom.badRequest("unknown command");
       }
-    },
-  });
-
-  server.route({
-    method: "GET",
-    path: "/api/new_room",
-    options: {
-      cors: true,
-    },
-    handler: (request, h) => {
-      const newRoom: Room = {
-        id: uuidv4(),
-        participants: [],
-        history: [initialGameState()],
-        participantPlayerMap: {},
-      };
-      rooms.set(newRoom.id, newRoom);
-
-      const resp: CreateRoomResp = {
-        roomId: newRoom.id,
-      };
-
-      return resp;
     },
   });
 
