@@ -41,7 +41,7 @@ export enum ServerCommand {
 
 export interface ClientMessageBase {
   cmd: ClientCommand;
-  payload: DonePayload | JoinPayload;
+  payload?: DonePayload | JoinPayload;
 }
 
 export interface DoneMessage extends ClientMessageBase {
@@ -54,7 +54,11 @@ export interface JoinMessage extends ClientMessageBase {
   payload: JoinPayload;
 }
 
-export type ClientMessage = DoneMessage | JoinMessage;
+export interface StartMessage extends ClientMessageBase {
+  cmd: ClientCommand.start;
+}
+
+export type ClientMessage = DoneMessage | JoinMessage | StartMessage;
 
 export interface UrlPayload {
   projectUrl: string;

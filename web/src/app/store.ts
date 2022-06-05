@@ -4,11 +4,12 @@ import {
   initialGameState,
 } from "../../../common/src/model";
 import {
+  combineReducers,
   configureStore,
-  ConfigureStoreOptions,
   createSlice,
   PayloadAction,
 } from "@reduxjs/toolkit";
+import { save, load } from "redux-localstorage-simple"
 
 
 export interface ReduxGameState {
@@ -42,14 +43,22 @@ export const { state, player, clear } = gameSlice.actions;
 export const selectCurrentGameState = (state: RootState) => state.game.history.slice(-1)[0];
 export const selectPlayer = (state: RootState) => state.game.player;
 
-export type RootState = {
-  game: ReduxGameState;
-};
+const rootReducer = combineReducers({
+  game: gameSlice.reducer
+})
 
-export const store = configureStore({
-  reducer: {
-    game: gameSlice.reducer,
-  },
-} as ConfigureStoreOptions);
+export type RootState = ReturnType<typeof rootReducer>;
+
+function initStore(preloadedState?: Partial<RootState>) {
+  return configureStore({
+    reducer: rootReducer,
+    middleware: [save()],
+    preloadedState,
+  })
+}
+
+export const store = initStore(
+  load(),
+)
 
 export type AppDispatch = typeof store.dispatch;

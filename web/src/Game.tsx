@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import { useParams } from "react-router-dom";
+import { GameState } from "../../common/src/model";
 import {
   ClientCommand,
   CreateRoomResp,
@@ -56,12 +57,20 @@ function Game() {
     });
   }, [dispatch, gameId]);
 
+  let body = <div>Loading...</div>;
+  switch (currentGameState.state) {
+    case GameState.not_started: 
+      body = <>
+        <span>Waiting for players to join. Click Start once everybody is in.</span>
+        <button onClick={()=>ws?.send(JSON.stringify({cmd: ClientCommand.start}))}>Start</button>
+      </>;
+  }
+
   return (
     <div className="game">
       <div className="game-board">
         <div>
-          <div>{JSON.stringify(currentGameState)}</div>
-          <div>{JSON.stringify(currentPlayer)}</div>
+          <div>{body}</div>
         </div>
       </div>
     </div>

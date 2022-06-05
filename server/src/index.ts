@@ -4,6 +4,8 @@ import { v4 as uuidv4 } from "uuid";
 import * as WebSocket from "ws";
 import {
   ClientPlayer,
+  GameSnapshot,
+  GameState,
   initialGameState,
   Player,
   PlayerState,
@@ -12,8 +14,6 @@ import {
 import {
   ClientCommand,
   ClientMessage,
-  CreateRoomResp,
-  PlayerPayload,
   ServerCommand,
   StateMessage,
   StatePayload,
@@ -164,6 +164,32 @@ const init = async () => {
             ws.send(
               JSON.stringify({ cmd: ServerCommand.player, payload: { player } })
             );
+          }
+
+          return "";
+        case ClientCommand.start:
+          if (room) {
+
+            const latestSnapshot = room.history[room.history.length - 1];
+
+            const newSnapshot: GameSnapshot = {
+              ...latestSnapshot,
+              state: GameState.in_progress,
+            };
+
+            room.history.push(newSnapshot);
+
+            room.participants.forEach((peer: any) => {
+              const msgPayload: StatePayload = {
+                state: newSnapshot,
+              };
+              peer.send(
+                JSON.stringify({
+                  cmd: ServerCommand.state,
+                  payload: msgPayload,
+                })
+              );
+            });
           }
 
           return "";
