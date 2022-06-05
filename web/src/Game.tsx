@@ -64,12 +64,29 @@ function Game() {
         <span>Waiting for players to join. Click Start once everybody is in.</span>
         <button onClick={()=>ws?.send(JSON.stringify({cmd: ClientCommand.start}))}>Start</button>
       </>;
+      break;
+    case GameState.in_progress: 
+      if (currentPlayer?.pendingProjectUrls && currentPlayer.pendingProjectUrls.length > 0) {
+        body = (<>
+          <span>Add your magic to this project and then come back and click "Done"</span>
+          <button onClick={()=>ws?.send(JSON.stringify({cmd: ClientCommand.done, }))}>Start</button>
+        </>);
+      } else {
+        body = <>
+          <span>Waiting for your project.</span>
+        </>;
+      }
+      
   }
 
   return (
     <div className="game">
       <div className="game-board">
         <div>
+          <div className="debug-info">
+            <div>{JSON.stringify(currentGameState)}</div>
+            <div>{JSON.stringify(currentPlayer)}</div>
+          </div>
           <div>{body}</div>
         </div>
       </div>

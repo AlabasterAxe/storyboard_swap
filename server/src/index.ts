@@ -139,12 +139,35 @@ const init = async () => {
 
             latestSnapshot.players[player.id] = player;
 
+            const newPlayers = {
+              ...latestSnapshot.players,
+              [player.id]: player,
+            }
+
+            const newPlayerRecipientMap: Record<string,string> = {};
+            if (Object.keys(newPlayers).length > 1) {
+              let lastPlayerId: string | undefined = undefined;
+              let firstPlayerId: string | undefined = undefined;
+              for (const playerId of Object.keys(newPlayers)) {
+                if (!lastPlayerId) {
+                  firstPlayerId = playerId;
+                } else {
+                  newPlayerRecipientMap[playerId] = lastPlayerId;
+                }
+                lastPlayerId = playerId;
+              }
+              if (firstPlayerId && lastPlayerId) {
+                newPlayerRecipientMap[firstPlayerId] = lastPlayerId;
+              }
+            }
+            
             const newSnapshot = {
               ...latestSnapshot,
               players: {
                 ...latestSnapshot.players,
                 [player.id]: player,
               },
+              playerRecipientMap: newPlayerRecipientMap,
             };
 
             room.history.push(newSnapshot);
