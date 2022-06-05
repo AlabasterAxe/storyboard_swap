@@ -135,6 +135,32 @@ const init = async () => {
 
             room.participantPlayerMap[ctx.id] = player.id;
 
+            const latestSnapshot = room.history[room.history.length - 1];
+
+            latestSnapshot.players[player.id] = player;
+
+            const newSnapshot = {
+              ...latestSnapshot,
+              players: {
+                ...latestSnapshot.players,
+                [player.id]: player,
+              },
+            };
+
+            room.history.push(newSnapshot);
+
+            room.participants.forEach((peer: any) => {
+              const msgPayload: StatePayload = {
+                state: newSnapshot,
+              };
+              peer.send(
+                JSON.stringify({
+                  cmd: ServerCommand.state,
+                  payload: msgPayload,
+                })
+              );
+            });
+
             ws.send(
               JSON.stringify({ cmd: ServerCommand.player, payload: { player } })
             );
