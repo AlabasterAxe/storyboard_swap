@@ -55,7 +55,7 @@ function Game() {
       
       setWs(webby);
     });
-  }, [dispatch, gameId]);
+  }, []);
 
   let body = <div>Loading...</div>;
   switch (currentGameState.state) {
@@ -69,7 +69,15 @@ function Game() {
       if (currentPlayer?.pendingProjectUrls && currentPlayer.pendingProjectUrls.length > 0) {
         body = (<>
           <span>Add your magic to this project and then come back and click "Done"</span>
-          <button onClick={()=>ws?.send(JSON.stringify({cmd: ClientCommand.done, }))}>Start</button>
+          <button onClick={()=>{
+            if (currentPlayer?.pendingProjectUrls && currentPlayer.pendingProjectUrls.length > 0) {
+              ws?.send(JSON.stringify({
+                cmd: ClientCommand.done, payload: {
+                  projectUrl: currentPlayer.pendingProjectUrls[0]
+                }
+              }));
+            }
+          }}>Done</button>
         </>);
       } else {
         body = <>

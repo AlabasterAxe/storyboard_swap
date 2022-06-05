@@ -28,9 +28,18 @@ export const gameSlice = createSlice({
   reducers: {
     state: (state, action: PayloadAction<GameSnapshot>) => {
       state.history = [...state.history, action.payload];
+
+      // if we see a new player state in the game state, update the player
+      if (state.player?.id && state.player.id in action.payload.players) {
+        state.player = action.payload.players[state.player.id];
+      }
     },
     player: (state, action: PayloadAction<ClientPlayer|undefined>) =>{
-      state.player = action.payload;
+      if (action.payload) {
+        state.player = {...state.player, ...action.payload};
+      } else {
+        state.player = undefined;
+      }
     },
     clear: (state) => {
       state.history = [initialGameState()];

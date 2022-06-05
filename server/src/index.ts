@@ -25,11 +25,12 @@ const STATIC_ROOT = "../web/build";
 
 // generates a new player but without the originalProjectUrl since that has to come from the
 // client
-function newPlayer(): Omit<Player, "originalProjectUrl"> {
+function newPlayer(originalProjectUrl: string): Player {
   return {
     id: uuidv4(),
     state: PlayerState.ready,
-    pendingProjectUrls: [],
+    pendingProjectUrls: [originalProjectUrl],
+    originalProjectUrl: originalProjectUrl,
   };
 }
 
@@ -128,8 +129,10 @@ const init = async () => {
         case ClientCommand.join:
           if (room) {
             const clientPlayer: ClientPlayer = message.payload.player;
+            // we initialize a new player assigned to their own project url but we defer to the provided
+            // client fields if they exist.
             let player: Player = {
-              ...newPlayer(),
+              ...newPlayer(clientPlayer.originalProjectUrl),
               ...clientPlayer,
             };
 
