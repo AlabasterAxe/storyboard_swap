@@ -18,15 +18,7 @@ import {
   StateMessage,
   StatePayload,
 } from "../../common/src/transfer";
-import dotenv from 'dotenv';
       
-dotenv.config();
-
-if (!process.env.ENVIRONMENT) {
-  console.error('no ENVIRONMENT provided!');
-  process.exit(1);
-}
-
 const rooms = new Map<string, Room>();
 
 const STATIC_ROOT = "../web/build";
@@ -276,6 +268,14 @@ const init = async () => {
           return Boom.badRequest("unknown command");
       }
     },
+  });
+
+  server.route({
+    method: "GET",
+    path: "/api/ok",
+    handler: (request, h) => {
+      return "ok";
+    }
   });
 
   server.route({
