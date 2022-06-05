@@ -16,7 +16,11 @@ import {
 } from "./app/store";
 import "./Game.css";
 
-const SERVER_SPEC = process.env.NODE_ENV === "development" ? "localhost:8080" : "https://storyboardswap.com";
+const SERVER_SPEC = process.env.NODE_ENV === "development" ? "localhost:8080" : "storyboardswap.com";
+
+function getWebsocketUrl(gameId: string) {
+    return `${process.env.NODE_ENV === "development" ? 'ws':'wss'}://${SERVER_SPEC}/api/connect/${gameId}`;
+}
 
 function Game() {
   const dispatch = useAppDispatch();
@@ -33,7 +37,7 @@ function Game() {
       : Promise.resolve(gameId)
     ).then((gameId) => {
       window.history.replaceState(null, "Game", `/g/${gameId}`);
-      const webby = new WebSocket(`ws://${SERVER_SPEC}/api/connect/${gameId}`);
+      const webby = new WebSocket(getWebsocketUrl(gameId));
       webby.onmessage = (event) => {
         console.log(event);
         const msg: ServerMessage = JSON.parse(event.data);
