@@ -1,0 +1,18 @@
+{
+  "name": "storyboard_swap",
+  "version": "1.0.0",
+  "repository": "https://github.com/AlabasterAxe/storyboard_swap.git",
+  "author": "Matt Keller <matt@descript.com>",
+  "license": "MIT",
+  "private": true,
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "build:web": "cd web && yarn build",
+    "build:server": "cd server && yarn build",
+    "run:prod": "cd server && yarn prod",
+    "build-and-run:prod": "yarn build:web && yarn build:server && yarn run:prod"
+  }
+}
