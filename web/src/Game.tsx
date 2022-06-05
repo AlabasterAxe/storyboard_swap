@@ -1,15 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { useParams } from "react-router-dom";
 import {
-  Player,
-} from "../../common/src/model";
-import {
+  ClientCommand,
   CreateRoomResp,
   ServerCommand,
-  ServerMessage,
+  ServerMessage
 } from "../../common/src/transfer";
 import { useAppDispatch, useAppSelector } from "./app/hooks";
-import { selectCurrentGameState, state } from "./app/store";
+import { player, selectCurrentGameState, selectPlayer, state } from "./app/store";
 import "./Game.css";
 
 // const SERVER_SPEC = "35.188.94.49:8080";
@@ -18,8 +16,9 @@ const SERVER_SPEC = "localhost:8080";
 function Game() {
   const dispatch = useAppDispatch();
   const currentGameState = useAppSelector(selectCurrentGameState);
-  const [myPlayer, setMyPlayer] = useState<Player | null>(null);
+  const currentPlayer = useAppSelector(selectPlayer);
   const { gameId } = useParams<{ gameId: string }>();
+  const [ws, setWs] = React.useState<WebSocket | undefined>(undefined);
 
   useEffect(() => {
     (gameId === "new"
@@ -38,12 +37,19 @@ function Game() {
             dispatch(state(msg.payload.state));
             break;
           case ServerCommand.player:
-            setMyPlayer(msg.payload.player);
+            dispatch(player(msg.payload.player));
             break;
           default:
             console.warn(`Unknown Command: ${(msg as any).cmd}`);
         }
       };
+      webby.send(JSON.stringify({
+        cmd: ClientCommand.join,
+        payload: {
+          player: currentPlayer
+        }
+      }));
+      setWs(webby);
     });
   }, [dispatch, gameId]);
 
@@ -52,7 +58,7 @@ function Game() {
       <div className="game-board">
         <div>
           <div>{JSON.stringify(currentGameState)}</div>
-          <div>{JSON.stringify(myPlayer)}</div>
+          <div>{JSON.stringify(currentPlayer)}</div>
         </div>
       </div>
     </div>

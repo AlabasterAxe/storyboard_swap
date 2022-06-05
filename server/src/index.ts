@@ -2,7 +2,13 @@ import Boom from "@hapi/boom";
 import Hapi from "@hapi/hapi";
 import { v4 as uuidv4 } from "uuid";
 import * as WebSocket from "ws";
-import { initialGameState, Player, PlayerState, Room } from "../../common/src/model";
+import {
+  ClientPlayer,
+  initialGameState,
+  Player,
+  PlayerState,
+  Room,
+} from "../../common/src/model";
 import {
   ClientCommand,
   ClientMessage,
@@ -16,6 +22,16 @@ import {
 const rooms = new Map<string, Room>();
 
 const STATIC_ROOT = "../web/build";
+
+// generates a new player but without the originalProjectUrl since that has to come from the
+// client
+function newPlayer(): Omit<Player, "originalProjectUrl"> {
+  return {
+    id: uuidv4(),
+    state: PlayerState.ready,
+    pendingProjectUrls: [],
+  };
+}
 
 const init = async () => {
   const server = Hapi.server({
@@ -79,8 +95,6 @@ const init = async () => {
         if (room) {
           room.participants.push(ws);
 
-          room.participantPlayerMap[ws.id] = playerId;
-
           const stateMessage: StateMessage = {
             cmd: ServerCommand.state,
             payload: {
@@ -89,19 +103,6 @@ const init = async () => {
           };
           ws.send(JSON.stringify(stateMessage));
         }
-
-        let player: Player = {
-          id: playerId,
-          state: PlayerState.ready,
-          originalProjectUrl: projectUrl,
-          pendingProjectUrls: [projectUrl]
-        };
-
-        ctx.roomId = roomId;
-        const payload: PlayerPayload = {
-          player
-        };
-        ws.send(JSON.stringify({ cmd: ServerCommand.player, payload }));
 
         return "";
       }
@@ -113,10 +114,23 @@ const init = async () => {
       if (typeof message.cmd !== "string") {
         return Boom.badRequest("must supply cmd field on req object");
       }
+      const room = rooms.get(ctx.roomId);
       switch (message.cmd) {
-        case ClientCommand.done:
-          const room = rooms.get(ctx.roomId);
+        case ClientCommand.join:
+          if (room) {
+            const clientPlayer: ClientPlayer = message.payload.player;
+            let player: Player = {
+              ...newPlayer(),
+              ...clientPlayer,
+            };
 
+            ws.send(
+              JSON.stringify({ cmd: ServerCommand.player, payload: { player } })
+            );
+          }
+
+          return "";
+        case ClientCommand.done:
           if (room) {
             const playerId = room.participantPlayerMap[ws.id];
             const latestSnapshot = room.history[room.history.length - 1];
@@ -124,9 +138,27 @@ const init = async () => {
             const nextPlayerId = latestSnapshot.playerRecipientMap[playerId];
             const nextPlayer = latestSnapshot.players[nextPlayerId];
             const completedUrl = message.payload.projectUrl;
-            const newPlayer = {...player, pendingProjectUrls: player.pendingProjectUrls.filter(url => url !== completedUrl)};
-            const newNextPlayer = {...nextPlayer, pendingProjectUrls: [...nextPlayer.pendingProjectUrls, completedUrl]};
-            const newSnapshot = { ...latestSnapshot, players: { ...latestSnapshot.players, [playerId]: newPlayer, [nextPlayerId]: newNextPlayer} };
+            const newPlayer = {
+              ...player,
+              pendingProjectUrls: player.pendingProjectUrls.filter(
+                (url) => url !== completedUrl
+              ),
+            };
+            const newNextPlayer = {
+              ...nextPlayer,
+              pendingProjectUrls: [
+                ...nextPlayer.pendingProjectUrls,
+                completedUrl,
+              ],
+            };
+            const newSnapshot = {
+              ...latestSnapshot,
+              players: {
+                ...latestSnapshot.players,
+                [playerId]: newPlayer,
+                [nextPlayerId]: newNextPlayer,
+              },
+            };
 
             room.history.push(newSnapshot);
             room.participants.forEach((peer: any) => {

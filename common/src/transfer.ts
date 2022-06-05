@@ -1,4 +1,4 @@
-import { GameSnapshot, Player } from "./model";
+import { ClientPlayer, GameSnapshot, Player } from "./model";
 
 export interface CreateRoomRqst {}
 
@@ -17,11 +17,17 @@ export enum ClientCommand {
   // this is used by players to indicate that they're done with their current
   // storyboard
   done = "DONE",
+
+  join = "JOIN",
 }
 
 export type DonePayload = {
   projectUrl: string;
 }
+
+export type JoinPayload = {
+  player: ClientPlayer; 
+} 
 
 export enum ServerCommand {
   // sends the next url to the player
@@ -33,22 +39,36 @@ export enum ServerCommand {
   state = "STATE",
 }
 
+export interface ClientMessageBase {
+  cmd: ClientCommand;
+  payload: DonePayload | JoinPayload;
+}
+
+export interface DoneMessage extends ClientMessageBase {
+  cmd: ClientCommand.done;
+  payload: DonePayload;
+}
+
+export interface JoinMessage extends ClientMessageBase {
+  cmd: ClientCommand.join;
+  payload: JoinPayload;
+}
+
+export type ClientMessage = DoneMessage | JoinMessage;
+
 export interface UrlPayload {
   projectUrl: string;
 }
 
 export interface PlayerPayload {
-  player: Player | null;
+  player: Player | undefined;
 }
 
 export interface StatePayload {
   state: GameSnapshot;
 }
 
-export interface ClientMessage {
-  cmd: ClientCommand;
-  payload: DonePayload;
-}
+
 
 interface ServerMessageBase {
   cmd: ServerCommand;
