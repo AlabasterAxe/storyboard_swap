@@ -47,7 +47,7 @@ export class GameService {
       };
       this.ws.onopen = ()=>{
           const state: RootState = store.getState();
-          if (state.game.player) {
+          if (state.game.player && state.game.player.roomId === this.gameId) {
             this.send({cmd: ClientCommand.join, payload: {player: state.game.player}});
           }
       };
