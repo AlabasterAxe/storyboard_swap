@@ -79,16 +79,18 @@ export class GameService {
     } else {
       fetch(getGameMessageEndpoint(this.gameId), {
         method: "POST",
-        body: JSON.stringify({ 
-            message,
-            playerId: store.getState().game.player?.id,
+        body: JSON.stringify({
+          message,
+          playerId: store.getState().game.player?.id,
         }),
       })
         .then((resp: Response) => resp.json())
         .then((resp: ClientMessageResponse) => {
-          for (const msg of resp.messages) {
-            for (const callback of this.callbacks) {
-              callback(msg);
+          if (resp.messages) {
+            for (const msg of resp.messages) {
+              for (const callback of this.callbacks) {
+                callback(msg);
+              }
             }
           }
         });

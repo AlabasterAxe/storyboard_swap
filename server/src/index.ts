@@ -51,17 +51,14 @@ function handleMessage(
 
         room.history.push(newSnapshot);
 
+        const stateMsg: ServerMessage = {
+          cmd: ServerCommand.state,
+          payload: { state: newSnapshot },
+        };
         room.participants.forEach((peer: any) => {
-          const msgPayload: StatePayload = {
-            state: newSnapshot,
-          };
-          peer.send(
-            JSON.stringify({
-              cmd: ServerCommand.state,
-              payload: msgPayload,
-            })
-          );
+          peer.send(JSON.stringify(stateMsg));
         });
+        res.push(stateMsg);
       }
       break;
 
@@ -337,10 +334,16 @@ const init = async () => {
       cors: true,
     },
     handler: (request, h) => {
-      const rqst = JSON.parse(request.payload as string) as ClientMessageRequest;
+      const rqst = JSON.parse(
+        request.payload as string
+      ) as ClientMessageRequest;
       const roomId = request.params.roomId;
       try {
-        const responseMessages = handleMessage(roomId, rqst.playerId, rqst.message);
+        const responseMessages = handleMessage(
+          roomId,
+          rqst.playerId,
+          rqst.message
+        );
         return {
           messages: responseMessages,
         };
