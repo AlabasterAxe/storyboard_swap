@@ -223,9 +223,18 @@ const init = async () => {
         case ClientCommand.done:
           if (room) {
             const playerId = room.participantPlayerMap[ctx.id];
+            if (!playerId) {
+              return Boom.badRequest("no playerId for context id; have you joined?");
+            }
             const latestSnapshot = room.history[room.history.length - 1];
             const player = latestSnapshot.players[playerId];
+            if (!player) {
+              return Boom.badRequest("no player found for playerId");
+            }
             const nextPlayerId = latestSnapshot.playerRecipientMap[playerId];
+            if (!nextPlayerId) {
+              return Boom.badRequest(`no recipient configured for playerId: ${playerId}`);
+            }
             const nextPlayer = latestSnapshot.players[nextPlayerId];
             const completedUrl = message.payload.projectUrl;
             const newPlayer = {
