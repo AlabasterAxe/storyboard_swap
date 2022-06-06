@@ -75,6 +75,11 @@ ul {
   justify-content: space-around;
 }
 
+.game-body {
+  display: flex;
+  flex-direction: column;
+}
+
 .game-info {
   margin-left: 20px;
 }

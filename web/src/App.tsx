@@ -7,11 +7,24 @@ const Game = lazy(() => import("./Game"));
 
 function Home() {
   const [roomName, setRoomName] = useState<string>(uuidv4());
-  return (<div className="contentColumn">
-    <div>Room Name</div>
-    <input value={roomName} onChange={(e)=>{setRoomName(e.target.value)}}/>
-    <Link to={"/g/" + roomName}>Start Game</Link>
-  </div>);
+  return (
+    <div className="game">
+      <div className="game-board">
+        <div className="game-body">
+          <div>Room Name</div>
+          <input
+            value={roomName}
+            onChange={(e) => {
+              setRoomName(e.target.value);
+            }}
+          />
+          <Link to={"/g/" + roomName}>
+            <button>Start Game</button>
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 class App extends Component<{}, {}> {
