@@ -1,4 +1,5 @@
-import { ClientMessage, ServerMessage } from "../../../common/src/transfer";
+import { ClientCommand, ClientMessage, ServerMessage } from "../../../common/src/transfer";
+import { RootState, store } from "../app/store";
 
 const SERVER_SPEC =
   process.env.NODE_ENV === "development"
@@ -43,6 +44,12 @@ export class GameService {
         for (const callback of this.callbacks) {
           callback(msg);
         }
+      };
+      this.ws.onopen = ()=>{
+          const state: RootState = store.getState();
+          if (state.game.player) {
+            this.send({cmd: ClientCommand.join, payload: {player: state.game.player}});
+          }
       };
       this.ws.onerror = () => {
         this.connectionFailures++;
