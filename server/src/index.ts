@@ -14,14 +14,110 @@ import {
 import {
   ClientCommand,
   ClientMessage,
+  ClientMessageRequest,
   ServerCommand,
+  ServerMessage,
   StateMessage,
   StatePayload,
 } from "../../common/src/transfer";
-      
+
 const rooms = new Map<string, Room>();
 
 const STATIC_ROOT = "../web/build";
+
+// this function returns the set of server messages that should be sent
+// sent to the calling user. It may also broadcast to all members of the room.
+function handleMessage(
+  roomId: string,
+  senderPlayerId: string,
+  message: ClientMessage
+): ServerMessage[] {
+  const res: ServerMessage[] = [];
+
+  const room = rooms.get(roomId);
+  switch (message.cmd) {
+    case ClientCommand.join:
+      console.log("join is websocket-specific");
+      break;
+
+    case ClientCommand.start:
+      if (room) {
+        const latestSnapshot = room.history[room.history.length - 1];
+
+        const newSnapshot: GameSnapshot = {
+          ...latestSnapshot,
+          state: GameState.in_progress,
+        };
+
+        room.history.push(newSnapshot);
+
+        room.participants.forEach((peer: any) => {
+          const msgPayload: StatePayload = {
+            state: newSnapshot,
+          };
+          peer.send(
+            JSON.stringify({
+              cmd: ServerCommand.state,
+              payload: msgPayload,
+            })
+          );
+        });
+      }
+      break;
+
+    case ClientCommand.done:
+      if (room) {
+        if (!senderPlayerId) {
+          throw new Error("no senderPlayerIdfor context id; have you joined?");
+        }
+        const latestSnapshot = room.history[room.history.length - 1];
+        const player = latestSnapshot.players[senderPlayerId];
+        if (!player) {
+          throw new Error("no player found for playerId");
+        }
+        const nextPlayerId = latestSnapshot.playerRecipientMap[senderPlayerId];
+        if (!nextPlayerId) {
+          throw new Error(
+            `no recipient configured for playerId: ${senderPlayerId}`
+          );
+        }
+        const nextPlayer = latestSnapshot.players[nextPlayerId];
+        const completedUrl = message.payload.projectUrl;
+        const newPlayer = {
+          ...player,
+          pendingProjectUrls: player.pendingProjectUrls.filter(
+            (url) => url !== completedUrl
+          ),
+        };
+        const newNextPlayer = {
+          ...nextPlayer,
+          pendingProjectUrls: [...nextPlayer.pendingProjectUrls, completedUrl],
+        };
+        const newSnapshot = {
+          ...latestSnapshot,
+          players: {
+            ...latestSnapshot.players,
+            [senderPlayerId]: newPlayer,
+            [nextPlayerId]: newNextPlayer,
+          },
+        };
+
+        room.history.push(newSnapshot);
+        const stateMessage: ServerMessage = {
+          cmd: ServerCommand.state,
+          payload: { state: newSnapshot },
+        };
+        res.push(stateMessage);
+        room.participants.forEach((peer: any) => {
+          peer.send(JSON.stringify(stateMessage));
+        });
+      }
+      break;
+    default:
+      throw new Error("unknown command");
+  }
+  return res;
+}
 
 // generates a new player but without the originalProjectUrl since that has to come from the
 // client
@@ -126,156 +222,92 @@ const init = async () => {
         return Boom.badRequest("must supply cmd field on req object");
       }
       const room = rooms.get(ctx.roomId);
-      switch (message.cmd) {
-        case ClientCommand.join:
-          if (room) {
-            const clientPlayer: ClientPlayer = message.payload.player;
-            // we initialize a new player assigned to their own project url but we defer to the provided
-            // client fields if they exist.
-            let player: Player = {
-              ...newPlayer(room.id, clientPlayer.originalProjectUrl),
-              ...(clientPlayer.roomId === room.id ? clientPlayer : {}),
-            };
 
-            room.participantPlayerMap[ctx.id] = player.id;
-
-            const latestSnapshot = room.history[room.history.length - 1];
-
-            latestSnapshot.players[player.id] = player;
-
-            const newPlayers = {
-              ...latestSnapshot.players,
-              [player.id]: player,
-            }
-
-            const newPlayerRecipientMap: Record<string,string> = {};
-            if (Object.keys(newPlayers).length > 1) {
-              let lastPlayerId: string | undefined = undefined;
-              let firstPlayerId: string | undefined = undefined;
-              for (const playerId of Object.keys(newPlayers)) {
-                if (!lastPlayerId) {
-                  firstPlayerId = playerId;
-                } else {
-                  newPlayerRecipientMap[playerId] = lastPlayerId;
-                }
-                lastPlayerId = playerId;
-              }
-              if (firstPlayerId && lastPlayerId) {
-                newPlayerRecipientMap[firstPlayerId] = lastPlayerId;
-              }
-            }
-            
-            const newSnapshot = {
-              ...latestSnapshot,
-              players: {
-                ...latestSnapshot.players,
-                [player.id]: player,
-              },
-              playerRecipientMap: newPlayerRecipientMap,
-            };
-
-            room.history.push(newSnapshot);
-
-            room.participants.forEach((peer: any) => {
-              const msgPayload: StatePayload = {
-                state: newSnapshot,
-              };
-              peer.send(
-                JSON.stringify({
-                  cmd: ServerCommand.state,
-                  payload: msgPayload,
-                })
-              );
-            });
-
-            ws.send(
-              JSON.stringify({ cmd: ServerCommand.player, payload: { player } })
-            );
-          }
-
-          return "";
-        case ClientCommand.start:
-          if (room) {
-
-            const latestSnapshot = room.history[room.history.length - 1];
-
-            const newSnapshot: GameSnapshot = {
-              ...latestSnapshot,
-              state: GameState.in_progress,
-            };
-
-            room.history.push(newSnapshot);
-
-            room.participants.forEach((peer: any) => {
-              const msgPayload: StatePayload = {
-                state: newSnapshot,
-              };
-              peer.send(
-                JSON.stringify({
-                  cmd: ServerCommand.state,
-                  payload: msgPayload,
-                })
-              );
-            });
-          }
-
-          return "";
-        case ClientCommand.done:
-          if (room) {
-            const playerId = room.participantPlayerMap[ctx.id];
-            if (!playerId) {
-              return Boom.badRequest("no playerId for context id; have you joined?");
-            }
-            const latestSnapshot = room.history[room.history.length - 1];
-            const player = latestSnapshot.players[playerId];
-            if (!player) {
-              return Boom.badRequest("no player found for playerId");
-            }
-            const nextPlayerId = latestSnapshot.playerRecipientMap[playerId];
-            if (!nextPlayerId) {
-              return Boom.badRequest(`no recipient configured for playerId: ${playerId}`);
-            }
-            const nextPlayer = latestSnapshot.players[nextPlayerId];
-            const completedUrl = message.payload.projectUrl;
-            const newPlayer = {
-              ...player,
-              pendingProjectUrls: player.pendingProjectUrls.filter(
-                (url) => url !== completedUrl
-              ),
-            };
-            const newNextPlayer = {
-              ...nextPlayer,
-              pendingProjectUrls: [
-                ...nextPlayer.pendingProjectUrls,
-                completedUrl,
-              ],
-            };
-            const newSnapshot = {
-              ...latestSnapshot,
-              players: {
-                ...latestSnapshot.players,
-                [playerId]: newPlayer,
-                [nextPlayerId]: newNextPlayer,
-              },
-            };
-
-            room.history.push(newSnapshot);
-            room.participants.forEach((peer: any) => {
-              const msgPayload: StatePayload = {
-                state: newSnapshot,
-              };
-              peer.send(
-                JSON.stringify({
-                  cmd: ServerCommand.state,
-                  payload: msgPayload,
-                })
-              );
-            });
-          }
-          return "";
-        default:
-          return Boom.badRequest("unknown command");
+      // should never happen
+      if (!room) {
+        return Boom.badRequest("no room found");
       }
+
+      if (message.cmd === ClientCommand.join) {
+        const clientPlayer: ClientPlayer = message.payload.player;
+        // we initialize a new player assigned to their own project url but we defer to the provided
+        // client fields if they exist.
+        let player: Player = {
+          ...newPlayer(room.id, clientPlayer.originalProjectUrl),
+          ...(clientPlayer.roomId === room.id ? clientPlayer : {}),
+        };
+
+        room.participantPlayerMap[ctx.id] = player.id;
+
+        const latestSnapshot = room.history[room.history.length - 1];
+
+        latestSnapshot.players[player.id] = player;
+
+        const newPlayers = {
+          ...latestSnapshot.players,
+          [player.id]: player,
+        };
+
+        const newPlayerRecipientMap: Record<string, string> = {};
+        if (Object.keys(newPlayers).length > 1) {
+          let lastPlayerId: string | undefined = undefined;
+          let firstPlayerId: string | undefined = undefined;
+          for (const playerId of Object.keys(newPlayers)) {
+            if (!lastPlayerId) {
+              firstPlayerId = playerId;
+            } else {
+              newPlayerRecipientMap[playerId] = lastPlayerId;
+            }
+            lastPlayerId = playerId;
+          }
+          if (firstPlayerId && lastPlayerId) {
+            newPlayerRecipientMap[firstPlayerId] = lastPlayerId;
+          }
+        }
+
+        const newSnapshot = {
+          ...latestSnapshot,
+          players: {
+            ...latestSnapshot.players,
+            [player.id]: player,
+          },
+          playerRecipientMap: newPlayerRecipientMap,
+        };
+
+        room.history.push(newSnapshot);
+
+        room.participants.forEach((peer: any) => {
+          const msgPayload: StatePayload = {
+            state: newSnapshot,
+          };
+          peer.send(
+            JSON.stringify({
+              cmd: ServerCommand.state,
+              payload: msgPayload,
+            })
+          );
+        });
+
+        ws.send(
+          JSON.stringify({ cmd: ServerCommand.player, payload: { player } })
+        );
+      } else {
+        const senderPlayerId = room.participantPlayerMap[ctx.id];
+        try {
+          const responseMessages = handleMessage(
+            ctx.roomId,
+            senderPlayerId,
+            message
+          );
+          for (const message of responseMessages) {
+            ws.send(JSON.stringify(message));
+          }
+        } catch (e) {
+          console.error(e);
+          return Boom.badRequest((e as Error).message);
+        }
+      }
+      return "";
     },
   });
 
@@ -284,7 +316,7 @@ const init = async () => {
     path: "/api/ok",
     handler: (request, h) => {
       return "ok";
-    }
+    },
   });
 
   server.route({
@@ -295,6 +327,26 @@ const init = async () => {
         path: ".",
         index: "index.html",
       },
+    },
+  });
+
+  server.route({
+    method: "POST",
+    path: "/api/game/{roomId}/message",
+    options: {
+      cors: true,
+    },
+    handler: (request, h) => {
+      const rqst = JSON.parse(request.payload as string) as ClientMessageRequest;
+      const roomId = request.params.roomId;
+      try {
+        const responseMessages = handleMessage(roomId, rqst.playerId, rqst.message);
+        return {
+          messages: responseMessages,
+        };
+      } catch (e) {
+        return Boom.badRequest((e as Error).message);
+      }
     },
   });
 

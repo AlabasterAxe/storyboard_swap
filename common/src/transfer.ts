@@ -75,6 +75,15 @@ export interface StatePayload {
 }
 
 
+export type ClientMessageRequest = {
+  message: ClientMessage;
+  playerId: string;
+}
+
+export type ClientMessageResponse = {
+  messages: ServerMessage[];
+}
+
 
 interface ServerMessageBase {
   cmd: ServerCommand;
