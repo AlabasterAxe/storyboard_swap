@@ -64,7 +64,7 @@ const init = async () => {
           connect: (blah: any) => {
             blah.ctx.to = setInterval(() => {
               if (blah.ws.readyState === WebSocket.OPEN) {
-                blah.ws.send(JSON.stringify({ cmd: "PING" }));
+                blah.ws.send(JSON.stringify({ cmd: ServerCommand.ping }));
               }
             }, 5000);
             console.log("player connected");

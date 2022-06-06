@@ -3,7 +3,6 @@ import { useParams } from "react-router-dom";
 import { GameState } from "../../common/src/model";
 import {
   ClientCommand,
-  CreateRoomResp,
   ServerCommand,
   ServerMessage,
 } from "../../common/src/transfer";
@@ -15,47 +14,39 @@ import {
   state,
 } from "./app/store";
 import "./Game.css";
-
-const SERVER_SPEC = process.env.NODE_ENV === "development" ? "localhost:8080" : "storyboardswap.com";
-
-function getWebsocketUrl(gameId: string) {
-    return `${process.env.NODE_ENV === "development" ? 'ws':'wss'}://${SERVER_SPEC}/api/connect/${gameId}`;
-}
+import { GameService, getGameService } from "./service/GameService";
 
 function Game() {
   const dispatch = useAppDispatch();
   const currentGameState = useAppSelector(selectCurrentGameState);
   const currentPlayer = useAppSelector(selectPlayer);
   const { gameId } = useParams<{ gameId: string }>();
-  const [ws, setWs] = React.useState<WebSocket | undefined>(undefined);
+  const [gameService, setGameService] = React.useState<GameService | undefined>(
+    undefined
+  );
 
   useEffect(() => {
-    (gameId === "new"
-      ? fetch(`http://${SERVER_SPEC}/api/new_room`)
-          .then((response) => response.json())
-          .then((data: CreateRoomResp) => data.roomId)
-      : Promise.resolve(gameId)
-    ).then((gameId) => {
-      window.history.replaceState(null, "Game", `/g/${gameId}`);
-      const webby = new WebSocket(getWebsocketUrl(gameId));
-      webby.onmessage = (event) => {
-        console.log(event);
-        const msg: ServerMessage = JSON.parse(event.data);
-        switch (msg.cmd) {
-          case ServerCommand.state:
-            dispatch(state(msg.payload.state));
-            break;
-          case ServerCommand.player:
-            dispatch(player(msg.payload.player));
-            break;
-          default:
-            console.warn(`Unknown Command: ${(msg as any).cmd}`);
-        }
-      };
+    window.history.replaceState(null, "Game", `/g/${gameId}`);
+    const gameService = getGameService(gameId);
 
-      setWs(webby);
+    const unsubscribeCallback = gameService.subscribe((msg: ServerMessage) => {
+      switch (msg.cmd) {
+        case ServerCommand.state:
+          dispatch(state(msg.payload.state));
+          break;
+        case ServerCommand.player:
+          dispatch(player(msg.payload.player));
+          break;
+        default:
+          console.warn(`Unknown Command: ${(msg as any).cmd}`);
+      }
     });
-  }, []);
+
+    setGameService(gameService);
+    return ()=>{
+      unsubscribeCallback();
+    }
+  }, [gameId, dispatch]);
 
   let body = <div>Loading...</div>;
   if (!currentPlayer || currentPlayer.roomId !== gameId) {
@@ -68,18 +59,21 @@ function Game() {
             dispatch(player({ originalProjectUrl: e.target.value }));
           }}
         />
-        <button onClick={()=>{
-          if (ws) {
-            ws.send(
-              JSON.stringify({
+        <button
+          disabled={!currentPlayer?.originalProjectUrl}
+          onClick={() => {
+            if (gameService && currentPlayer) {
+              gameService.send({
                 cmd: ClientCommand.join,
                 payload: {
                   player: currentPlayer,
                 },
-              })
-            );
-          }
-        }}>Join</button>
+              });
+            }
+          }}
+        >
+          Join
+        </button>
       </>
     );
   } else {
@@ -91,9 +85,13 @@ function Game() {
               Waiting for players to join. Click Start once everybody is in.
             </span>
             <button
-              onClick={() =>
-                ws?.send(JSON.stringify({ cmd: ClientCommand.start }))
-              }
+              onClick={() => {
+                if (gameService) {
+                  gameService.send({
+                    cmd: ClientCommand.start,
+                  });
+                }
+              }}
             >
               Start
             </button>
@@ -117,14 +115,12 @@ function Game() {
                     currentPlayer?.pendingProjectUrls &&
                     currentPlayer.pendingProjectUrls.length > 0
                   ) {
-                    ws?.send(
-                      JSON.stringify({
-                        cmd: ClientCommand.done,
-                        payload: {
-                          projectUrl: currentPlayer.pendingProjectUrls[0],
-                        },
-                      })
-                    );
+                    gameService?.send({
+                      cmd: ClientCommand.done,
+                      payload: {
+                        projectUrl: currentPlayer.pendingProjectUrls[0],
+                      },
+                    });
                   }
                 }}
               >
@@ -146,10 +142,12 @@ function Game() {
     <div className="game">
       <div className="game-board">
         <div>
-          {process.env.NODE_ENV === "development" && <div className="debug-info">
-            <div>{JSON.stringify(currentGameState)}</div>
-            <div>{JSON.stringify(currentPlayer)}</div>
-          </div>}
+          {process.env.NODE_ENV === "development" && (
+            <div className="debug-info">
+              <div>{JSON.stringify(currentGameState)}</div>
+              <div>{JSON.stringify(currentPlayer)}</div>
+            </div>
+          )}
           <div>{body}</div>
         </div>
       </div>

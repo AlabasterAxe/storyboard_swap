@@ -37,6 +37,8 @@ export enum ServerCommand {
   player = "PLAYER",
 
   state = "STATE",
+
+  ping = "PING",
 }
 
 export interface ClientMessageBase {
@@ -94,4 +96,8 @@ export interface StateMessage extends ServerMessageBase {
   payload: StatePayload;
 }
 
-export type ServerMessage = UrlMessage | PlayerMessage | StateMessage;
+export interface PingMessage extends ServerMessageBase {
+  cmd: ServerCommand.ping;
+}
+
+export type ServerMessage = UrlMessage | PlayerMessage | StateMessage | PingMessage;
