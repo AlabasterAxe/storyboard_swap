@@ -123,7 +123,7 @@ function Game() {
           body = (
             <>
               <span>
-                Add your magic to <a href={currentPlayer.pendingProjectUrls[0]}>this project</a> and then come back and click
+                Add your magic to <a href={currentPlayer.pendingProjectUrls[0]+'?lite=true'} target="_blank">this project</a> and then come back and click
                 "Done"
               </span>
               <br />

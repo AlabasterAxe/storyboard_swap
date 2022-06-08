@@ -46,6 +46,7 @@ export const gameSlice = createSlice({
     clear: (state, action: PayloadAction<{gameId: string}>) => {
       state.history = [initialGameState()];
       state.gameId = action.payload.gameId;
+      state.player = undefined;
     },
   },
 });
