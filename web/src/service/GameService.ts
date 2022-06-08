@@ -32,8 +32,6 @@ export class GameService {
   private connectionFailures = 0;
 
   constructor(readonly gameId: string) {
-    // defined so that ws is always defined but this is actually immediately closed
-    this.ws = new WebSocket(getWebsocketUrl(gameId));
     this.reconnect();
   }
 
