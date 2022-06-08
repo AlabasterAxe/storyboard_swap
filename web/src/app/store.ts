@@ -14,12 +14,14 @@ import { save, load } from "redux-localstorage-simple"
 
 export interface ReduxGameState {
   history: GameSnapshot[];
-  player: ClientPlayer | undefined
+  player: ClientPlayer | undefined;
+  gameId: string | undefined;
 }
 
 const initialState: ReduxGameState = {
   history: [initialGameState()],
   player: undefined,
+  gameId: undefined,
 };
 
 export const gameSlice = createSlice({
@@ -41,8 +43,9 @@ export const gameSlice = createSlice({
         state.player = undefined;
       }
     },
-    clear: (state) => {
+    clear: (state, action: PayloadAction<{gameId: string}>) => {
       state.history = [initialGameState()];
+      state.gameId = action.payload.gameId;
     },
   },
 });
@@ -50,6 +53,7 @@ export const gameSlice = createSlice({
 export const { state, player, clear } = gameSlice.actions;
 
 export const selectCurrentGameState = (state: RootState) => state.game.history.slice(-1)[0];
+export const selectCurrentGameId = (state: RootState) => state.game.gameId;
 export const selectPlayer = (state: RootState) => state.game.player;
 
 const rootReducer = combineReducers({

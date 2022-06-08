@@ -8,7 +8,9 @@ import {
 } from "../../common/src/transfer";
 import { useAppDispatch, useAppSelector } from "./app/hooks";
 import {
+  clear,
   player,
+  selectCurrentGameId,
   selectCurrentGameState,
   selectPlayer,
   state,
@@ -23,6 +25,7 @@ const validProjectRegex =
 function Game() {
   const dispatch = useAppDispatch();
   const currentGameState = useAppSelector(selectCurrentGameState);
+  const reduxGameId = useAppSelector(selectCurrentGameId);
   const currentPlayer = useAppSelector(selectPlayer);
   const { gameId } = useParams<{ gameId: string }>();
   const [gameService, setGameService] = React.useState<GameService | undefined>(
@@ -32,6 +35,9 @@ function Game() {
 
   useEffect(() => {
     window.history.replaceState(null, "Game", `/g/${gameId}`);
+    if (gameId !== reduxGameId) {
+      dispatch(clear({gameId}));
+    }
     const gameService = getGameService(gameId);
 
     const unsubscribeCallback = gameService.subscribe((msg: ServerMessage) => {
@@ -51,7 +57,7 @@ function Game() {
     return ()=>{
       unsubscribeCallback();
     }
-  }, [gameId, dispatch]);
+  }, [gameId, dispatch, reduxGameId]);
 
   let body = <div>Loading...</div>;
   if (!currentPlayer || currentPlayer.roomId !== gameId) {
@@ -70,20 +76,15 @@ function Game() {
         />
         <button
           disabled={!currentPlayer?.originalProjectUrl}
-          onClick={async () => {
+          onClick={() => {
             if (!currentPlayer?.originalProjectUrl || !validProjectRegex.test(currentPlayer?.originalProjectUrl)) {
               setInvalidProjectUrl(true);
               return;
             }
 
             setInvalidProjectUrl(false);
-            if (gameService && currentPlayer) {
-              await gameService.send({
-                cmd: ClientCommand.join,
-                payload: {
-                  player: currentPlayer,
-                },
-              });
+            if (gameService) {
+              gameService.join();
             }
           }}
         >
@@ -101,9 +102,9 @@ function Game() {
             </span>
             <br />
             <button
-              onClick={async () => {
+              onClick={() => {
                 if (gameService) {
-                  await gameService.send({
+                  gameService.send({
                     cmd: ClientCommand.start,
                   });
                 }
