@@ -27,7 +27,7 @@ function getGameMessageEndpoint(gameId: string) {
 
 export class GameService {
   private readonly callbacks: ((message: ServerMessage) => void)[] = [];
-  private ws: WebSocket;
+  private _ws: WebSocket | undefined;
   private watchdogTimeout: ReturnType<typeof setTimeout> | undefined;
   private connectionFailures = 0;
 
@@ -37,63 +37,70 @@ export class GameService {
     this.reconnect();
   }
 
-  private reconnect(): void {
-    if (this.connectionFailures > MAX_RETRY_LIMIT) {
-      return;
-    }
-
-    this.ws.close();
-    this.ws = new WebSocket(getWebsocketUrl(this.gameId));
-    this.ws.onmessage = (event) => {
-      console.log(event);
-      this.connectionFailures = 0;
-      clearTimeout(this.watchdogTimeout);
-      this.watchdogTimeout = setTimeout(() => {
-        this.reconnect();
-      }, 10000);
-      const msg: ServerMessage = JSON.parse(event.data);
-      for (const callback of this.callbacks) {
-        callback(msg);
-      }
-    };
-    this.ws.onopen = () => {
-      const state: RootState = store.getState();
-      if (state.game.player && state.game.player.roomId === this.gameId) {
-        this.send({
-          cmd: ClientCommand.join,
-          payload: { player: state.game.player },
-        });
-      }
-    };
-    this.ws.onerror = () => {
-      this.connectionFailures++;
+  private reconnect(): Promise<WebSocket> {
+    return new Promise((resolve, reject) => {
       if (this.connectionFailures > MAX_RETRY_LIMIT) {
-        console.error("too many connection failures");
+        reject("Too many connection failures");
       }
-    };
+      if (this._ws) {
+        this._ws.close();
+      }
+      this._ws = new WebSocket(getWebsocketUrl(this.gameId));
+      this._ws.onmessage = (event) => {
+        console.log(event);
+        // we consider connection failures
+        // if we have to reconnect without getting
+        // any messages from the server
+        // so we reset connectionFailures
+        // if we get a message from the server
+        this.connectionFailures = 0;
+        clearTimeout(this.watchdogTimeout);
+        this.watchdogTimeout = setTimeout(() => {
+          this.reconnect();
+        }, 10000);
+        const msg: ServerMessage = JSON.parse(event.data);
+        for (const callback of this.callbacks) {
+          callback(msg);
+        }
+      };
+      this._ws.onopen = () => {
+        const state: RootState = store.getState();
+        if (state.game.player && state.game.player.roomId === this.gameId) {
+          this.send({
+            cmd: ClientCommand.join,
+            payload: { player: state.game.player },
+          });
+        }
+        resolve(this._ws as WebSocket);
+      };
+      this._ws.onerror = () => {
+        this.connectionFailures++;
+        if (this.connectionFailures > MAX_RETRY_LIMIT) {
+          console.error("too many connection failures");
+        }
+      };
+    });
   }
 
-  send(message: ClientMessage): void {
+  async send(message: ClientMessage): Promise<void> {
     if (message.cmd === ClientCommand.join) {
-      this.ws.send(JSON.stringify(message));
+      (await this.reconnect()).send(JSON.stringify(message));
     } else {
-      fetch(getGameMessageEndpoint(this.gameId), {
+      const resp = await fetch(getGameMessageEndpoint(this.gameId), {
         method: "POST",
         body: JSON.stringify({
           message,
           playerId: store.getState().game.player?.id,
         }),
-      })
-        .then((resp: Response) => resp.json())
-        .then((resp: ClientMessageResponse) => {
-          if (resp.messages) {
-            for (const msg of resp.messages) {
-              for (const callback of this.callbacks) {
-                callback(msg);
-              }
-            }
+      });
+      const json = await resp.json();
+      if (json.messages) {
+        for (const msg of json.messages) {
+          for (const callback of this.callbacks) {
+            callback(msg);
           }
-        });
+        }
+      }
     }
   }
 
@@ -109,7 +116,9 @@ export class GameService {
   }
 
   shutdown(): void {
-    this.ws.close();
+    if (this._ws) {
+      this._ws.close();
+    }
   }
 }
 

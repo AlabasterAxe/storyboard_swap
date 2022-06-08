@@ -70,7 +70,7 @@ function Game() {
         />
         <button
           disabled={!currentPlayer?.originalProjectUrl}
-          onClick={() => {
+          onClick={async () => {
             if (!currentPlayer?.originalProjectUrl || !validProjectRegex.test(currentPlayer?.originalProjectUrl)) {
               setInvalidProjectUrl(true);
               return;
@@ -78,7 +78,7 @@ function Game() {
 
             setInvalidProjectUrl(false);
             if (gameService && currentPlayer) {
-              gameService.send({
+              await gameService.send({
                 cmd: ClientCommand.join,
                 payload: {
                   player: currentPlayer,
@@ -101,9 +101,9 @@ function Game() {
             </span>
             <br />
             <button
-              onClick={() => {
+              onClick={async () => {
                 if (gameService) {
-                  gameService.send({
+                  await gameService.send({
                     cmd: ClientCommand.start,
                   });
                 }
