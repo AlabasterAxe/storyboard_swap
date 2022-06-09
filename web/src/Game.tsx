@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { GameState } from "../../common/src/model";
+import { GameState, Player } from "../../common/src/model";
 import {
   ClientCommand,
   ServerCommand,
@@ -20,6 +20,28 @@ import { GameService, getGameService } from "./service/GameService";
 
 const validProjectRegex =
   /^((https:\/\/)?web.descript.com\/)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{5}))?$/i;
+
+function getOwnerForProject(players: Player[], projectUrl: string): Player | undefined {
+    for (const player of players) {
+        if (player.originalProjectUrl === projectUrl) {
+            return player;
+        }
+    }
+    return undefined;
+}
+
+function getProjectDisplayString(currentPlayer: Player, allPlayers: Player[], projectUrl: string): string {
+  if (currentPlayer.originalProjectUrl === projectUrl) {
+    return "your own Project";
+  }
+
+  const owner = getOwnerForProject(allPlayers, projectUrl);
+  if (owner) {
+    return `${owner.displayName}'s Project`;
+  }
+
+  return "a mysterious Project";
+}
 
 function Game() {
   const dispatch = useAppDispatch();
@@ -142,15 +164,16 @@ function Game() {
           currentPlayer?.pendingProjectUrls &&
           currentPlayer.pendingProjectUrls.length > 0
         ) {
+          const assignedUrl = currentPlayer.pendingProjectUrls[0];
           body = (
             <>
               <span>
                 Add your magic to{" "}
                 <a
-                  href={currentPlayer.pendingProjectUrls[0] + "?lite=true"}
+                  href={assignedUrl + "?lite=true"}
                   target="_blank"
                 >
-                  this project
+                  {getProjectDisplayString(currentPlayer as Player, Object.values(currentGameState.players), assignedUrl)}
                 </a>{" "}
                 and then come back and click "Done"
               </span>
