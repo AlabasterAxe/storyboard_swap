@@ -103,6 +103,13 @@ function handleMessage(
         };
         const newSnapshot = {
           ...latestSnapshot,
+          projects: {
+            ...latestSnapshot.projects,
+            [completedUrl]: {
+              ...latestSnapshot.projects[completedUrl],
+              turns: latestSnapshot.projects[completedUrl].turns + 1,
+            }
+          },
           players: {
             ...latestSnapshot.players,
             [senderPlayerId]: newPlayer,
