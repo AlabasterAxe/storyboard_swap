@@ -131,7 +131,7 @@ export class GameService {
 let _gameService: GameService | undefined;
 
 export function getGameService(gameId: string): GameService {
-  if (!_gameService || _gameService?.gameId === gameId) {
+  if (!_gameService || _gameService?.gameId !== gameId) {
     _gameService?.shutdown();
     _gameService = new GameService(gameId);
   }
