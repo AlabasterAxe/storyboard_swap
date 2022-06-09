@@ -9,6 +9,7 @@ import {
   initialGameState,
   Player,
   PlayerState,
+  ProjectInfo,
   Room,
 } from "../../common/src/model";
 import {
@@ -153,7 +154,7 @@ const LETTERS = [
   "X",
   "Y",
   "Z",
-]
+];
 
 const RANDOM_NAME_PREFIX = "Player ";
 
@@ -163,7 +164,9 @@ function getLetterName(roomId: string): string {
     throw new Error("no room found for roomId");
   }
   const usedLetters = new Set();
-  for (const player of Object.values(room.history[room.history.length - 1].players)) {
+  for (const player of Object.values(
+    room.history[room.history.length - 1].players
+  )) {
     if (player.displayName.startsWith(RANDOM_NAME_PREFIX)) {
       usedLetters.add(player.displayName.substring(RANDOM_NAME_PREFIX.length));
     }
@@ -177,13 +180,17 @@ function getLetterName(roomId: string): string {
   let candidate;
   do {
     candidate = LETTERS[Math.floor(Math.random() * LETTERS.length)];
-  } while(usedLetters.has(candidate));
+  } while (usedLetters.has(candidate));
   return `${RANDOM_NAME_PREFIX}${candidate}`;
 }
 
 // generates a new player but without the originalProjectUrl since that has to come from the
 // client
-function newPlayer(roomId: string, originalProjectUrl: string, displayName?: string): Player {
+function newPlayer(
+  roomId: string,
+  originalProjectUrl: string,
+  displayName?: string
+): Player {
   return {
     roomId,
     id: uuidv4(),
@@ -296,7 +303,11 @@ const init = async () => {
         // we initialize a new player assigned to their own project url but we defer to the provided
         // client fields if they exist.
         let player: Player = {
-          ...newPlayer(room.id, clientPlayer.originalProjectUrl, clientPlayer.displayName),
+          ...newPlayer(
+            room.id,
+            clientPlayer.originalProjectUrl,
+            clientPlayer.displayName
+          ),
           ...(clientPlayer.roomId === room.id ? clientPlayer : {}),
         };
 
@@ -304,38 +315,45 @@ const init = async () => {
 
         const latestSnapshot = room.history[room.history.length - 1];
 
-        latestSnapshot.players[player.id] = player;
-
         const newPlayers = {
           ...latestSnapshot.players,
           [player.id]: player,
         };
 
-        const newPlayerRecipientMap: Record<string, string> = {};
-        if (Object.keys(newPlayers).length > 1) {
-          let lastPlayerId: string | undefined = undefined;
-          let firstPlayerId: string | undefined = undefined;
-          for (const playerId of Object.keys(newPlayers)) {
-            if (!lastPlayerId) {
-              firstPlayerId = playerId;
-            } else {
-              newPlayerRecipientMap[playerId] = lastPlayerId;
-            }
-            lastPlayerId = playerId;
-          }
-          if (firstPlayerId && lastPlayerId) {
-            newPlayerRecipientMap[firstPlayerId] = lastPlayerId;
-          }
-        }
-
         const newSnapshot = {
           ...latestSnapshot,
-          players: {
-            ...latestSnapshot.players,
-            [player.id]: player,
-          },
-          playerRecipientMap: newPlayerRecipientMap,
+          players: newPlayers,
         };
+
+        if (!(player.id in latestSnapshot.players)) {
+          const newProjects: Record<string, ProjectInfo> = {
+            ...latestSnapshot.projects,
+            [player.originalProjectUrl]: {
+              ownerId: player.id,
+              url: player.originalProjectUrl,
+              turns: 0,
+            },
+          };
+
+          newSnapshot.projects = newProjects;
+          const newPlayerRecipientMap: Record<string, string> = {};
+          if (Object.keys(newPlayers).length > 1) {
+            let lastPlayerId: string | undefined = undefined;
+            let firstPlayerId: string | undefined = undefined;
+            for (const playerId of Object.keys(newPlayers)) {
+              if (!lastPlayerId) {
+                firstPlayerId = playerId;
+              } else {
+                newPlayerRecipientMap[playerId] = lastPlayerId;
+              }
+              lastPlayerId = playerId;
+            }
+            if (firstPlayerId && lastPlayerId) {
+              newPlayerRecipientMap[firstPlayerId] = lastPlayerId;
+            }
+          }
+          newSnapshot.playerRecipientMap = newPlayerRecipientMap;
+        }
 
         room.history.push(newSnapshot);
 
