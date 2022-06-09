@@ -1,5 +1,11 @@
 import React, { Component, lazy, Suspense, useState } from "react";
-import { BrowserRouter, Route, Link, Switch } from "react-router-dom";
+import {
+  BrowserRouter,
+  Route,
+  Link,
+  Switch,
+  useHistory,
+} from "react-router-dom";
 import "./App.css";
 import { v4 as uuidv4 } from "uuid";
 
@@ -7,20 +13,26 @@ const Game = lazy(() => import("./Game"));
 
 function Home() {
   const [roomName, setRoomName] = useState<string>(uuidv4());
+  const history = useHistory();
   return (
     <div className="game">
       <div className="game-board">
         <div className="game-body">
           <div>Room Name</div>
-          <input
-            value={roomName}
-            onChange={(e) => {
-              setRoomName(e.target.value);
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              history.push(`/g/${roomName}`);
             }}
-          />
-          <Link to={"/g/" + roomName}>
-            <button>Start Game</button>
-          </Link>
+          >
+            <input
+              value={roomName}
+              onChange={(e) => {
+                setRoomName(e.target.value);
+              }}
+            />
+            <button type="submit">Start Game</button>
+          </form>
         </div>
       </div>
     </div>
