@@ -80,6 +80,16 @@ function handleMessage(
         }
         const nextPlayer = latestSnapshot.players[nextPlayerId];
         const completedUrl = message.payload.projectUrl;
+        if (!player.pendingProjectUrls.includes(completedUrl)) {
+          console.warn("player can't complete projectUrl it doesn't have");
+          // we send the state back to the user since it looks like they
+          // have out of date state
+          res.push({
+            cmd: ServerCommand.state,
+            payload: { state: latestSnapshot },
+          });
+          return res;
+        }
         const newPlayer = {
           ...player,
           pendingProjectUrls: player.pendingProjectUrls.filter(
