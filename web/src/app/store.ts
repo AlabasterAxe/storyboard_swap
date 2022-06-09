@@ -2,6 +2,7 @@ import {
   ClientPlayer,
   GameSnapshot,
   initialGameState,
+  Player,
 } from "../../../common/src/model";
 import {
   combineReducers,
@@ -14,7 +15,7 @@ import { save, load } from "redux-localstorage-simple"
 
 export interface ReduxGameState {
   history: GameSnapshot[];
-  player: ClientPlayer | undefined;
+  player: Partial<Player>| undefined;
   gameId: string | undefined;
 }
 
@@ -36,7 +37,7 @@ export const gameSlice = createSlice({
         state.player = action.payload.players[state.player.id];
       }
     },
-    player: (state, action: PayloadAction<ClientPlayer|undefined>) =>{
+    player: (state, action: PayloadAction<Partial<Player>|undefined>) =>{
       if (action.payload) {
         state.player = {...state.player, ...action.payload};
       } else {

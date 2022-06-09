@@ -126,15 +126,71 @@ function handleMessage(
   return res;
 }
 
+const LETTERS = [
+  "A",
+  "B",
+  "C",
+  "D",
+  "E",
+  "F",
+  "G",
+  "H",
+  "I",
+  "J",
+  "K",
+  "L",
+  "M",
+  "N",
+  "O",
+  "P",
+  "Q",
+  "R",
+  "S",
+  "T",
+  "U",
+  "V",
+  "W",
+  "X",
+  "Y",
+  "Z",
+]
+
+const RANDOM_NAME_PREFIX = "Player ";
+
+function getLetterName(roomId: string): string {
+  const room = rooms.get(roomId);
+  if (!room) {
+    throw new Error("no room found for roomId");
+  }
+  const usedLetters = new Set();
+  for (const player of Object.values(room.history[room.history.length - 1].players)) {
+    if (player.displayName.startsWith(RANDOM_NAME_PREFIX)) {
+      usedLetters.add(player.displayName.substring(RANDOM_NAME_PREFIX.length));
+    }
+  }
+
+  if (usedLetters.size === LETTERS.length) {
+    return "Matt's Bug";
+  }
+
+  // grab a random letter that isn't used
+  let candidate;
+  do {
+    candidate = LETTERS[Math.floor(Math.random() * LETTERS.length)];
+  } while(usedLetters.has(candidate));
+  return `${RANDOM_NAME_PREFIX}${candidate}`;
+}
+
 // generates a new player but without the originalProjectUrl since that has to come from the
 // client
-function newPlayer(roomId: string, originalProjectUrl: string): Player {
+function newPlayer(roomId: string, originalProjectUrl: string, displayName?: string): Player {
   return {
     roomId,
     id: uuidv4(),
     state: PlayerState.ready,
     pendingProjectUrls: [originalProjectUrl],
     originalProjectUrl: originalProjectUrl,
+    displayName: displayName || getLetterName(roomId),
   };
 }
 
@@ -240,7 +296,7 @@ const init = async () => {
         // we initialize a new player assigned to their own project url but we defer to the provided
         // client fields if they exist.
         let player: Player = {
-          ...newPlayer(room.id, clientPlayer.originalProjectUrl),
+          ...newPlayer(room.id, clientPlayer.originalProjectUrl, clientPlayer.displayName),
           ...(clientPlayer.roomId === room.id ? clientPlayer : {}),
         };
 

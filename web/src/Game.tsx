@@ -63,7 +63,6 @@ function Game() {
   if (!currentPlayer || currentPlayer.roomId !== gameId) {
     body = (
       <>
-        <div>Create a project and paste the URL here to join:</div>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -81,6 +80,21 @@ function Game() {
             }
           }}
         >
+          <div>Name:</div>
+          <input
+            style={{ backgroundColor: invalidProjectUrl ? "pink" : "white" }}
+            value={currentPlayer?.displayName ?? ""}
+            onChange={(e) => {
+              if (
+                currentPlayer?.originalProjectUrl &&
+                validProjectRegex.test(currentPlayer?.originalProjectUrl)
+              ) {
+                setInvalidProjectUrl(false);
+              }
+              dispatch(player({ displayName: e.target.value }));
+            }}
+          />
+        <div>Create a Storyboard + Live Collab Project and paste the URL here to join:</div>
           <input
             style={{ backgroundColor: invalidProjectUrl ? "pink" : "white" }}
             value={currentPlayer?.originalProjectUrl ?? ""}
