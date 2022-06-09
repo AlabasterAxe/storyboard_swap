@@ -118,6 +118,10 @@ export class GameService {
   }
 
   shutdown(): void {
+    if (this.watchdogTimeout) {
+        clearTimeout(this.watchdogTimeout);
+        this.watchdogTimeout = undefined;
+    }
     if (this._ws) {
       this._ws.close();
     }

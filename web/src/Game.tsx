@@ -19,8 +19,7 @@ import "./Game.css";
 import { GameService, getGameService } from "./service/GameService";
 
 const validProjectRegex =
-    /^((https:\/\/)?web.descript.com\/)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{5}))?$/i;
-
+  /^((https:\/\/)?web.descript.com\/)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{5}))?$/i;
 
 function Game() {
   const dispatch = useAppDispatch();
@@ -36,7 +35,7 @@ function Game() {
   useEffect(() => {
     window.history.replaceState(null, "Game", `/g/${gameId}`);
     if (gameId !== reduxGameId) {
-      dispatch(clear({gameId}));
+      dispatch(clear({ gameId }));
     }
     const gameService = getGameService(gameId);
 
@@ -54,9 +53,10 @@ function Game() {
     });
 
     setGameService(gameService);
-    return ()=>{
+    return () => {
+      gameService.shutdown();
       unsubscribeCallback();
-    }
+    };
   }, [gameId, dispatch, reduxGameId]);
 
   let body = <div>Loading...</div>;
@@ -64,20 +64,13 @@ function Game() {
     body = (
       <>
         <div>Create a project and paste the URL here to join:</div>
-        <input
-          style={{backgroundColor: invalidProjectUrl ? "pink" : "white"}}
-          value={currentPlayer?.originalProjectUrl ?? ""}
-          onChange={(e) => {
-            if (currentPlayer?.originalProjectUrl && validProjectRegex.test(currentPlayer?.originalProjectUrl)) {
-              setInvalidProjectUrl(false);
-            }
-            dispatch(player({ originalProjectUrl: e.target.value }));
-          }}
-        />
-        <button
-          disabled={!currentPlayer?.originalProjectUrl}
-          onClick={() => {
-            if (!currentPlayer?.originalProjectUrl || !validProjectRegex.test(currentPlayer?.originalProjectUrl)) {
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (
+              !currentPlayer?.originalProjectUrl ||
+              !validProjectRegex.test(currentPlayer?.originalProjectUrl)
+            ) {
               setInvalidProjectUrl(true);
               return;
             }
@@ -88,8 +81,23 @@ function Game() {
             }
           }}
         >
-          Join
-        </button>
+          <input
+            style={{ backgroundColor: invalidProjectUrl ? "pink" : "white" }}
+            value={currentPlayer?.originalProjectUrl ?? ""}
+            onChange={(e) => {
+              if (
+                currentPlayer?.originalProjectUrl &&
+                validProjectRegex.test(currentPlayer?.originalProjectUrl)
+              ) {
+                setInvalidProjectUrl(false);
+              }
+              dispatch(player({ originalProjectUrl: e.target.value }));
+            }}
+          />
+          <button type="submit" disabled={!currentPlayer?.originalProjectUrl}>
+            Join
+          </button>
+        </form>
       </>
     );
   } else {
@@ -123,8 +131,14 @@ function Game() {
           body = (
             <>
               <span>
-                Add your magic to <a href={currentPlayer.pendingProjectUrls[0]+'?lite=true'} target="_blank">this project</a> and then come back and click
-                "Done"
+                Add your magic to{" "}
+                <a
+                  href={currentPlayer.pendingProjectUrls[0] + "?lite=true"}
+                  target="_blank"
+                >
+                  this project
+                </a>{" "}
+                and then come back and click "Done"
               </span>
               <br />
               <button
