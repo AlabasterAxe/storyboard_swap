@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { GameSnapshot, GameState, Player } from "../../common/src/model";
 import {
@@ -31,6 +32,32 @@ function getOwnerForProject(
     }
   }
   return undefined;
+}
+
+function getBlockingPlayerName(
+  currentGameState: GameSnapshot,
+  currentPlayerId: string | undefined,
+): string | undefined {
+  for (const [senderId, recipientId] of Object.entries(currentGameState.playerRecipientMap)) {
+    if (recipientId === currentPlayerId) {
+      return currentGameState.players[senderId].displayName;
+    }
+  }
+  return undefined;
+}
+
+function getAssignedProjects(currentPlayerId: string | undefined, state: GameSnapshot): string[] {
+  if (!currentPlayerId) {
+    return []; 
+  }
+
+  const result = [];
+  for (const [url, playerId] of Object.entries(state.projectAssignments)) {
+    if (playerId === currentPlayerId) {
+      result.push(url);
+    }
+  }
+  return result;
 }
 
 function getProjectDisplayString(
@@ -122,7 +149,7 @@ function Game() {
     const unsubscribeCallback = gameService.subscribe((msg: ServerMessage) => {
       switch (msg.cmd) {
         case ServerCommand.state:
-          dispatch(state(msg.payload.state));
+          dispatch(state(msg.payload));
           break;
         case ServerCommand.player:
           dispatch(player(msg.payload.player));
@@ -138,6 +165,20 @@ function Game() {
       unsubscribeCallback();
     };
   }, [gameId, dispatch, reduxGameId]);
+
+  const onDoneClick = useCallback(()=>{
+    const assignedProjects = getAssignedProjects(currentPlayer?.id, currentGameState);
+    if (
+      assignedProjects.length > 0
+    ) {
+      gameService?.send({
+        cmd: ClientCommand.done,
+        payload: {
+          projectUrl: assignedProjects[0],
+        },
+      });
+    }
+  }, [currentPlayer, currentGameState]);
 
   let body = <div>Loading...</div>;
   if (!currentPlayer || currentPlayer.roomId !== gameId) {
@@ -208,7 +249,6 @@ function Game() {
             <span>
               Waiting for players to join. Click "Start" once everybody is in.
             </span>
-            <br />
             <button
               disabled={Object.keys(currentGameState.players).length < 2}
               onClick={() => {
@@ -225,11 +265,9 @@ function Game() {
         );
         break;
       case GameState.in_progress:
-        if (
-          currentPlayer?.pendingProjectUrls &&
-          currentPlayer.pendingProjectUrls.length > 0
-        ) {
-          const assignedUrl = currentPlayer.pendingProjectUrls[0];
+        const assignedProjects = getAssignedProjects(currentPlayer?.id, currentGameState);
+        if (assignedProjects.length > 0) {
+          const assignedUrl = assignedProjects[0];
           body = (
             <>
               {currentGameState.projects[assignedUrl].turns === 0 ? (
@@ -238,19 +276,7 @@ function Game() {
                 <SubsequentRoundPrompt assignedUrl={assignedUrl} currentPlayer={currentPlayer as Player} gameState={currentGameState}/>
               )}
               <button
-                onClick={() => {
-                  if (
-                    currentPlayer?.pendingProjectUrls &&
-                    currentPlayer.pendingProjectUrls.length > 0
-                  ) {
-                    gameService?.send({
-                      cmd: ClientCommand.done,
-                      payload: {
-                        projectUrl: currentPlayer.pendingProjectUrls[0],
-                      },
-                    });
-                  }
-                }}
+                onClick={onDoneClick}
               >
                 Done
               </button>
@@ -259,7 +285,7 @@ function Game() {
         } else {
           body = (
             <>
-              <span>Waiting for the other player to finish their project.</span>
+              <span>Waiting for {getBlockingPlayerName(currentGameState, currentPlayer?.id) || "the other player"} to finish their project.</span>
             </>
           );
         }

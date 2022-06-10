@@ -22,8 +22,6 @@ export interface Player {
   state: PlayerState;
   originalProjectUrl: string;
 
-  pendingProjectUrls: string[];
-
   // kind of a hack, used to blow away prior
   // player state if a user joins another game
   roomId: string;
@@ -50,6 +48,7 @@ export interface GameSnapshot {
   playerRecipientMap: Record<string, string>;
   players: Record<string, Player>;
   projects: Record<string, ProjectInfo>;
+  projectAssignments: Record<string, string>;
 }
 
 export function initialGameState(): GameSnapshot {
@@ -59,6 +58,7 @@ export function initialGameState(): GameSnapshot {
     players: {},
     playerRecipientMap: {},
     projects: {},
+    projectAssignments: {},
   };
 }
 

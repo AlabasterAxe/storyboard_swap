@@ -72,6 +72,7 @@ export interface PlayerPayload {
 
 export interface StatePayload {
   state: GameSnapshot;
+  message?: ClientMessage;
 }
 
 

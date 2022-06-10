@@ -26,6 +26,18 @@ const rooms = new Map<string, Room>();
 
 const STATIC_ROOT = "../web/build";
 
+function reassignProject(
+  currentAssignments: Record<string, string>,
+  projectUrl: string,
+  newOwnerId: string
+): Record<string, string> {
+  const newAssignments = Object.fromEntries(
+    Object.entries(currentAssignments).filter(([url]) => url !== projectUrl)
+  );
+  newAssignments[projectUrl] = newOwnerId;
+  return newAssignments;
+}
+
 // this function returns the set of server messages that should be sent
 // sent to the calling user. It may also broadcast to all members of the room.
 function handleMessage(
@@ -79,28 +91,20 @@ function handleMessage(
             `no recipient configured for playerId: ${senderPlayerId}`
           );
         }
-        const nextPlayer = latestSnapshot.players[nextPlayerId];
         const completedUrl = message.payload.projectUrl;
-        if (!player.pendingProjectUrls.includes(completedUrl)) {
+        if (
+          latestSnapshot.projectAssignments[completedUrl] !== senderPlayerId
+        ) {
           console.warn("player can't complete projectUrl it doesn't have");
           // we send the state back to the user since it looks like they
           // have out of date state
           res.push({
             cmd: ServerCommand.state,
-            payload: { state: latestSnapshot },
+            payload: { state: latestSnapshot, message },
           });
           return res;
         }
-        const newPlayer = {
-          ...player,
-          pendingProjectUrls: player.pendingProjectUrls.filter(
-            (url) => url !== completedUrl
-          ),
-        };
-        const newNextPlayer = {
-          ...nextPlayer,
-          pendingProjectUrls: [...nextPlayer.pendingProjectUrls, completedUrl],
-        };
+
         const newSnapshot = {
           ...latestSnapshot,
           projects: {
@@ -108,19 +112,15 @@ function handleMessage(
             [completedUrl]: {
               ...latestSnapshot.projects[completedUrl],
               turns: latestSnapshot.projects[completedUrl].turns + 1,
-            }
+            },
           },
-          players: {
-            ...latestSnapshot.players,
-            [senderPlayerId]: newPlayer,
-            [nextPlayerId]: newNextPlayer,
-          },
+          projectAssignments: reassignProject(latestSnapshot.projectAssignments, completedUrl, nextPlayerId),
         };
 
         room.history.push(newSnapshot);
         const stateMessage: ServerMessage = {
           cmd: ServerCommand.state,
-          payload: { state: newSnapshot },
+          payload: { state: newSnapshot, message },
         };
         res.push(stateMessage);
         room.participants.forEach((peer: any) => {
@@ -191,8 +191,6 @@ function getLetterName(roomId: string): string {
   return `${RANDOM_NAME_PREFIX}${candidate}`;
 }
 
-// generates a new player but without the originalProjectUrl since that has to come from the
-// client
 function newPlayer(
   roomId: string,
   originalProjectUrl: string,
@@ -202,8 +200,7 @@ function newPlayer(
     roomId,
     id: uuidv4(),
     state: PlayerState.ready,
-    pendingProjectUrls: [originalProjectUrl],
-    originalProjectUrl: originalProjectUrl,
+    originalProjectUrl,
     displayName: displayName || getLetterName(roomId),
   };
 }
@@ -363,6 +360,8 @@ const init = async () => {
             }
           }
           newSnapshot.playerRecipientMap = newPlayerRecipientMap;
+
+          newSnapshot.projectAssignments = {...latestSnapshot.projectAssignments, [player.originalProjectUrl]: player.id};
         }
 
         room.history.push(newSnapshot);
@@ -370,6 +369,7 @@ const init = async () => {
         room.participants.forEach((peer: any) => {
           const msgPayload: StatePayload = {
             state: newSnapshot,
+            message
           };
           peer.send(
             JSON.stringify({
