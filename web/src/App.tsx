@@ -7,18 +7,23 @@ import {
   useHistory,
 } from "react-router-dom";
 import "./App.css";
-import { v4 as uuidv4 } from "uuid";
+import generate from "project-name-generator";
 
 const Game = lazy(() => import("./Game"));
 
 function Home() {
-  const [roomName, setRoomName] = useState<string>(uuidv4());
+  const [roomName, setRoomName] = useState<string>(generate().dashed);
   const history = useHistory();
   return (
     <div className="game">
       <div className="game-board">
         <div className="game-body">
-          <div>Room Name</div>
+          <h1>Storyboard Swap</h1>
+          <div>
+            To create a new game or join an existing game, enter a game
+            identifier and click 'Start Game'.
+            Once your game is started, others can join with the link.
+          </div>
           <form
             onSubmit={(e) => {
               e.preventDefault();

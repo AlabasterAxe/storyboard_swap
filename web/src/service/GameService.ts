@@ -63,7 +63,7 @@ export class GameService {
       };
       this._ws.onopen = () => {
         const state: RootState = store.getState();
-        if (state.game.player && this._ws) {
+        if (state.game.player?.originalProjectUrl && this._ws) {
           this._ws.send(JSON.stringify({
             cmd: ClientCommand.join,
             payload: { player: state.game.player },

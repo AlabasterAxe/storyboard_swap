@@ -307,6 +307,9 @@ const init = async () => {
 
       if (message.cmd === ClientCommand.join) {
         const clientPlayer: ClientPlayer = message.payload.player;
+        if (!clientPlayer.originalProjectUrl) {
+          return Boom.badRequest("must supply originalProjectUrl");
+        }
         // we initialize a new player assigned to their own project url but we defer to the provided
         // client fields if they exist.
         let player: Player = {

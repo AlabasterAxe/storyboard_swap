@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { GameState, Player } from "../../common/src/model";
+import { GameSnapshot, GameState, Player } from "../../common/src/model";
 import {
   ClientCommand,
   ServerCommand,
@@ -21,18 +21,25 @@ import { GameService, getGameService } from "./service/GameService";
 const validProjectRegex =
   /^((https:\/\/)?web.descript.com\/)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{5}))?$/i;
 
-function getOwnerForProject(players: Player[], projectUrl: string): Player | undefined {
-    for (const player of players) {
-        if (player.originalProjectUrl === projectUrl) {
-            return player;
-        }
+function getOwnerForProject(
+  players: Player[],
+  projectUrl: string
+): Player | undefined {
+  for (const player of players) {
+    if (player.originalProjectUrl === projectUrl) {
+      return player;
     }
-    return undefined;
+  }
+  return undefined;
 }
 
-function getProjectDisplayString(currentPlayer: Player, allPlayers: Player[], projectUrl: string): string {
+function getProjectDisplayString(
+  currentPlayer: Player,
+  allPlayers: Player[],
+  projectUrl: string
+): string {
   if (currentPlayer.originalProjectUrl === projectUrl) {
-    return "your own Project";
+    return "your Project";
   }
 
   const owner = getOwnerForProject(allPlayers, projectUrl);
@@ -41,6 +48,57 @@ function getProjectDisplayString(currentPlayer: Player, allPlayers: Player[], pr
   }
 
   return "a mysterious Project";
+}
+
+function InitialRoundPrompt({
+  assignedUrl,
+  currentPlayer,
+  gameState, 
+}: {
+  assignedUrl: string,
+  currentPlayer: Player,
+  gameState: GameSnapshot
+}
+) {
+  return (
+    <span>
+      Start{" "}
+      <a href={assignedUrl + "?lite=true"} target="_blank" rel="noreferrer">
+        {getProjectDisplayString(
+          currentPlayer as Player,
+          Object.values(gameState.players),
+          assignedUrl
+        )}
+      </a>{" "}
+      with a sentence or two of Overdubbed audio. When you're finished come back
+      and click "Done".
+    </span>
+  );
+}
+
+function SubsequentRoundPrompt({
+  assignedUrl,
+  currentPlayer,
+  gameState, 
+}: {
+  assignedUrl: string,
+  currentPlayer: Player,
+  gameState: GameSnapshot
+}) {
+  return (
+    <span>
+      Add B-roll and sound effects for the previous Scene in{" "}
+      <a href={assignedUrl + "?lite=true"} target="_blank" rel="noreferrer">
+        {getProjectDisplayString(
+          currentPlayer as Player,
+          Object.values(gameState.players),
+          assignedUrl
+        )}
+      </a>{" "}
+      and continue the story a sentence or two of your own. Don't forget to
+      overdub your new text! When you're finished come back and click "Done".
+    </span>
+  );
 }
 
 function Game() {
@@ -85,6 +143,10 @@ function Game() {
   if (!currentPlayer || currentPlayer.roomId !== gameId) {
     body = (
       <>
+        <div>
+          Create a new Storyboard + Live Collab Project, give edit access to
+          Descript HQ, and paste the URL below.
+        </div>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -102,20 +164,20 @@ function Game() {
             }
           }}
         >
-          <div>Name:</div>
+          <div>Your Name:</div>
           <input
             value={currentPlayer?.displayName ?? ""}
             onChange={(e) => {
               if (
-                currentPlayer?.originalProjectUrl &&
-                validProjectRegex.test(currentPlayer?.originalProjectUrl)
+                !currentPlayer?.originalProjectUrl ||
+                validProjectRegex.test(currentPlayer.originalProjectUrl)
               ) {
                 setInvalidProjectUrl(false);
               }
               dispatch(player({ displayName: e.target.value }));
             }}
           />
-        <div>Create a Storyboard + Live Collab Project, give edit access to Descript HQ, and paste the URL here to join:</div>
+          <div>Project URL:</div>
           <input
             style={{ backgroundColor: invalidProjectUrl ? "pink" : "white" }}
             value={currentPlayer?.originalProjectUrl ?? ""}
@@ -129,7 +191,10 @@ function Game() {
               dispatch(player({ originalProjectUrl: e.target.value }));
             }}
           />
-          <button type="submit" disabled={!currentPlayer?.originalProjectUrl}>
+          <button
+            type="submit"
+            disabled={!currentPlayer?.originalProjectUrl || invalidProjectUrl}
+          >
             Join
           </button>
         </form>
@@ -145,6 +210,7 @@ function Game() {
             </span>
             <br />
             <button
+              disabled={Object.keys(currentGameState.players).length < 2}
               onClick={() => {
                 if (gameService) {
                   gameService.send({
@@ -166,17 +232,11 @@ function Game() {
           const assignedUrl = currentPlayer.pendingProjectUrls[0];
           body = (
             <>
-              <span>
-                {currentGameState.projects[assignedUrl].turns === 0 ? "Start your story with a sentence or two of Overdubbed audio" : "Add B-roll and sound effects for the previous Scene and add a sentence or two of your own"} to{" "}
-                <a
-                  href={assignedUrl + "?lite=true"}
-                  target="_blank"
-                >
-                  {getProjectDisplayString(currentPlayer as Player, Object.values(currentGameState.players), assignedUrl)}
-                </a>{" "}
-                and then come back and click "Done".
-              </span>
-              <br />
+              {currentGameState.projects[assignedUrl].turns === 0 ? (
+                <InitialRoundPrompt assignedUrl={assignedUrl} currentPlayer={currentPlayer as Player} gameState={currentGameState}/>
+              ) : (
+                <SubsequentRoundPrompt assignedUrl={assignedUrl} currentPlayer={currentPlayer as Player} gameState={currentGameState}/>
+              )}
               <button
                 onClick={() => {
                   if (
@@ -209,15 +269,25 @@ function Game() {
   return (
     <div className="game">
       <div className="game-board">
-        <div>
-          {process.env.NODE_ENV === "development" && (
-            <div className="debug-info">
-              <div>{JSON.stringify(currentGameState)}</div>
-              <div>{JSON.stringify(currentPlayer)}</div>
+        {process.env.NODE_ENV === "development" && (
+          <div className="debug-info">
+            <div>{JSON.stringify(currentGameState)}</div>
+            <div>{JSON.stringify(currentPlayer)}</div>
+          </div>
+        )}
+        {currentGameState?.players &&
+          Object.keys(currentGameState?.players).length > 0 && (
+            <div className="player-container">
+              <h2>Players: </h2>
+              <ul>
+                {Object.values(currentGameState.players).map((p) => (
+                  <li key={p.id}>{p.displayName}</li>
+                ))}
+              </ul>
             </div>
           )}
-          <div className="game-body">{body}</div>
-        </div>
+
+        <div className="game-body">{body}</div>
       </div>
     </div>
   );
