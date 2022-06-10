@@ -69,3 +69,20 @@ input {
   width: 100%;
   box-sizing: border-box;
 }
+
+.waiting-players-container {
+  position: relative;
+  height: 30px;
+}
+
+.waiting-player {
+  border-radius: 9999px;
+  height: 10px;
+  width: 10px;
+  transition: left 500ms;
+  position: absolute;
+  top: calc(50% - 5px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}

@@ -104,7 +104,6 @@ function Game() {
         >
           <div>Name:</div>
           <input
-            style={{ backgroundColor: invalidProjectUrl ? "pink" : "white" }}
             value={currentPlayer?.displayName ?? ""}
             onChange={(e) => {
               if (
@@ -116,7 +115,7 @@ function Game() {
               dispatch(player({ displayName: e.target.value }));
             }}
           />
-        <div>Create a Storyboard + Live Collab Project and paste the URL here to join:</div>
+        <div>Create a Storyboard + Live Collab Project, give edit access to Descript HQ, and paste the URL here to join:</div>
           <input
             style={{ backgroundColor: invalidProjectUrl ? "pink" : "white" }}
             value={currentPlayer?.originalProjectUrl ?? ""}
@@ -168,14 +167,14 @@ function Game() {
           body = (
             <>
               <span>
-                Add your magic to{" "}
+                {currentGameState.projects[assignedUrl].turns === 0 ? "Start your story with a sentence or two of Overdubbed audio" : "Add B-roll and sound effects for the previous Scene and add a sentence or two of your own"} to{" "}
                 <a
                   href={assignedUrl + "?lite=true"}
                   target="_blank"
                 >
                   {getProjectDisplayString(currentPlayer as Player, Object.values(currentGameState.players), assignedUrl)}
                 </a>{" "}
-                and then come back and click "Done"
+                and then come back and click "Done".
               </span>
               <br />
               <button
