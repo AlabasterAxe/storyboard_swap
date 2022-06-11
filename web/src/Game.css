@@ -120,3 +120,18 @@ svg {
   height: 100%;
   width: 20%;
 }
+
+li {
+  position: relative;
+}
+
+.kick-button {
+  visibility: hidden;
+  position: absolute;
+  right: 0;
+  cursor: pointer;
+}
+
+li:hover .kick-button {
+  visibility: visible;
+}

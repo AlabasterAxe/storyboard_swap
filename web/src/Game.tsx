@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { GameSnapshot, GameState, Player } from "../../common/src/model";
+import { getAssignedProjects } from "../../common/src/queries";
 import {
   ClientCommand,
   ServerCommand,
@@ -44,20 +45,6 @@ function getBlockingPlayerName(
     }
   }
   return undefined;
-}
-
-function getAssignedProjects(currentPlayerId: string | undefined, state: GameSnapshot): string[] {
-  if (!currentPlayerId) {
-    return []; 
-  }
-
-  const result = [];
-  for (const [url, playerId] of Object.entries(state.projectAssignments)) {
-    if (playerId === currentPlayerId) {
-      result.push(url);
-    }
-  }
-  return result;
 }
 
 function getProjectDisplayString(
@@ -167,7 +154,7 @@ function Game() {
   }, [gameId, dispatch, reduxGameId]);
 
   const onDoneClick = useCallback(()=>{
-    const assignedProjects = getAssignedProjects(currentPlayer?.id, currentGameState);
+    const assignedProjects = getAssignedProjects(currentGameState, currentPlayer?.id);
     if (
       assignedProjects.length > 0
     ) {
@@ -265,7 +252,7 @@ function Game() {
         );
         break;
       case GameState.in_progress:
-        const assignedProjects = getAssignedProjects(currentPlayer?.id, currentGameState);
+        const assignedProjects = getAssignedProjects(currentGameState, currentPlayer?.id);
         if (assignedProjects.length > 0) {
           const assignedUrl = assignedProjects[0];
           body = (
@@ -301,13 +288,25 @@ function Game() {
             <div>{JSON.stringify(currentPlayer)}</div>
           </div>
         )}
-        {currentGameState?.players &&
-          Object.keys(currentGameState?.players).length > 0 && (
+        {currentGameState?.players && currentPlayer?.id &&
+          Object.keys(currentGameState?.players).includes(currentPlayer.id) && (
             <div className="player-container">
               <h2>Players: </h2>
               <ul>
                 {Object.values(currentGameState.players).map((p) => (
-                  <li key={p.id}>{p.displayName}</li>
+                  <li key={p.id}>{p.displayName}{p.id === currentPlayer?.id ? " (you)" : ""}<span className="kick-button" onClick={()=>{
+                    if (gameService) {
+                      gameService.send({
+                        cmd: ClientCommand.kick,
+                        payload: {
+                          playerId: p.id,
+                        }
+                      });
+                      if(p.id === currentPlayer?.id){
+                        dispatch(clear({gameId}));
+                      }
+                    }
+                  }}>✖</span></li>
                 ))}
               </ul>
             </div>
@@ -322,3 +321,4 @@ function Game() {
 // ========================================
 
 export default Game;
+

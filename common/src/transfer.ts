@@ -19,10 +19,16 @@ export enum ClientCommand {
   done = "DONE",
 
   join = "JOIN",
+
+  kick = "KICK",
 }
 
 export type DonePayload = {
   projectUrl: string;
+}
+
+export type KickPayload = {
+  playerId: string;
 }
 
 export type JoinPayload = {
@@ -43,12 +49,17 @@ export enum ServerCommand {
 
 export interface ClientMessageBase {
   cmd: ClientCommand;
-  payload?: DonePayload | JoinPayload;
+  payload?: DonePayload | JoinPayload | KickPayload;
 }
 
 export interface DoneMessage extends ClientMessageBase {
   cmd: ClientCommand.done;
   payload: DonePayload;
+}
+
+export interface KickMessage extends ClientMessageBase {
+  cmd: ClientCommand.kick;
+  payload: KickPayload;
 }
 
 export interface JoinMessage extends ClientMessageBase {
@@ -60,7 +71,7 @@ export interface StartMessage extends ClientMessageBase {
   cmd: ClientCommand.start;
 }
 
-export type ClientMessage = DoneMessage | JoinMessage | StartMessage;
+export type ClientMessage = DoneMessage | JoinMessage | StartMessage | KickMessage;
 
 export interface UrlPayload {
   projectUrl: string;

@@ -21,6 +21,9 @@ import {
   StateMessage,
   StatePayload,
 } from "../../common/src/transfer";
+import {
+  getAssignedProjects,
+} from "../../common/src/queries";
 
 const rooms = new Map<string, Room>();
 
@@ -36,6 +39,26 @@ function reassignProject(
   );
   newAssignments[projectUrl] = newOwnerId;
   return newAssignments;
+}
+
+function generateNewRecipientMap(newPlayers: string[]): Record<string, string> {
+  const newPlayerRecipientMap: Record<string, string> = {};
+  if (newPlayers.length > 1) {
+    let lastPlayerId: string | undefined = undefined;
+    let firstPlayerId: string | undefined = undefined;
+    for (const playerId of newPlayers) {
+      if (!lastPlayerId) {
+        firstPlayerId = playerId;
+      } else {
+        newPlayerRecipientMap[playerId] = lastPlayerId;
+      }
+      lastPlayerId = playerId;
+    }
+    if (firstPlayerId && lastPlayerId) {
+      newPlayerRecipientMap[firstPlayerId] = lastPlayerId;
+    }
+  }
+  return newPlayerRecipientMap;
 }
 
 // this function returns the set of server messages that should be sent
@@ -114,7 +137,11 @@ function handleMessage(
               turns: latestSnapshot.projects[completedUrl].turns + 1,
             },
           },
-          projectAssignments: reassignProject(latestSnapshot.projectAssignments, completedUrl, nextPlayerId),
+          projectAssignments: reassignProject(
+            latestSnapshot.projectAssignments,
+            completedUrl,
+            nextPlayerId
+          ),
         };
 
         room.history.push(newSnapshot);
@@ -126,6 +153,49 @@ function handleMessage(
         room.participants.forEach((peer: any) => {
           peer.send(JSON.stringify(stateMessage));
         });
+      }
+      break;
+    case ClientCommand.kick:
+      if (room) {
+        const latestSnapshot = room.history[room.history.length - 1];
+        const playerToKickId = message.payload.playerId;
+        const playerToKick = latestSnapshot.players[playerToKickId];
+        const newPlayers = {...latestSnapshot.players};
+        delete newPlayers[playerToKickId];
+
+        let newAssignments = {...latestSnapshot.projectAssignments};
+        for (const projectUrls of getAssignedProjects(latestSnapshot, playerToKickId)) {
+          newAssignments = reassignProject(
+            newAssignments,
+            projectUrls,
+            latestSnapshot.playerRecipientMap[playerToKickId] || Object.keys(latestSnapshot.players)[0],
+          );
+        };
+        delete newAssignments[playerToKick.originalProjectUrl];
+
+        const newPlayerRecipientMap = generateNewRecipientMap(Object.keys(newPlayers));
+
+        // potentially we shouldn't remove projects?
+        const newProjects = {...latestSnapshot.projects};
+        delete newProjects[playerToKick.originalProjectUrl];
+
+        const newSnapshot: GameSnapshot = {
+          ...latestSnapshot,
+          projects: newProjects,
+          projectAssignments: newAssignments,
+          players: newPlayers,
+          playerRecipientMap: newPlayerRecipientMap,
+        };
+        
+        room.history.push(newSnapshot);
+        const stateMessage: ServerMessage = {
+          cmd: ServerCommand.state,
+          payload: { state: newSnapshot, message },
+        };
+        res.push(stateMessage);
+        room.participants.forEach((peer: any) => {
+          peer.send(JSON.stringify(stateMessage));
+        }); 
       }
       break;
     default:
@@ -307,6 +377,12 @@ const init = async () => {
         if (!clientPlayer.originalProjectUrl) {
           return Boom.badRequest("must supply originalProjectUrl");
         }
+
+        for (const player of Object.values(room.history[room.history.length - 1].players)) {
+          if (player.originalProjectUrl === clientPlayer.originalProjectUrl && (!clientPlayer.id || player.id !== clientPlayer.id)) {
+            return Boom.badRequest("duplicate originalProjectUrl");
+          }
+        }
         // we initialize a new player assigned to their own project url but we defer to the provided
         // client fields if they exist.
         let player: Player = {
@@ -343,25 +419,15 @@ const init = async () => {
           };
 
           newSnapshot.projects = newProjects;
-          const newPlayerRecipientMap: Record<string, string> = {};
-          if (Object.keys(newPlayers).length > 1) {
-            let lastPlayerId: string | undefined = undefined;
-            let firstPlayerId: string | undefined = undefined;
-            for (const playerId of Object.keys(newPlayers)) {
-              if (!lastPlayerId) {
-                firstPlayerId = playerId;
-              } else {
-                newPlayerRecipientMap[playerId] = lastPlayerId;
-              }
-              lastPlayerId = playerId;
-            }
-            if (firstPlayerId && lastPlayerId) {
-              newPlayerRecipientMap[firstPlayerId] = lastPlayerId;
-            }
-          }
-          newSnapshot.playerRecipientMap = newPlayerRecipientMap;
 
-          newSnapshot.projectAssignments = {...latestSnapshot.projectAssignments, [player.originalProjectUrl]: player.id};
+          newSnapshot.playerRecipientMap = generateNewRecipientMap(
+            Object.keys(newPlayers)
+          );
+
+          newSnapshot.projectAssignments = {
+            ...latestSnapshot.projectAssignments,
+            [player.originalProjectUrl]: player.id,
+          };
         }
 
         room.history.push(newSnapshot);
@@ -369,7 +435,7 @@ const init = async () => {
         room.participants.forEach((peer: any) => {
           const msgPayload: StatePayload = {
             state: newSnapshot,
-            message
+            message,
           };
           peer.send(
             JSON.stringify({
