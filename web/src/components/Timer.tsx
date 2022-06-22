@@ -19,7 +19,7 @@ function secondsToTime(remainingSeconds: number) {
   }
 
 export function Timer({durationMs, startTimestamp}: {durationMs: number, startTimestamp: number}) {
-    const [timeLeftMs, setTimeLeft] = useState(durationMs);
+    const [timeLeftMs, setTimeLeft] = useState(startTimestamp + durationMs - Date.now());
 
     useEffect(() => {
         const interval = setInterval(() => {
