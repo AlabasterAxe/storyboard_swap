@@ -9,6 +9,7 @@ import {
   initialGameState,
   Player,
   PlayerState,
+  ProjectAssignment,
   ProjectInfo,
   Room,
 } from "../../common/src/model";
@@ -30,14 +31,14 @@ const rooms = new Map<string, Room>();
 const STATIC_ROOT = "../web/build";
 
 function reassignProject(
-  currentAssignments: Record<string, string>,
+  currentAssignments: Record<string, ProjectAssignment>,
   projectUrl: string,
   newOwnerId: string
-): Record<string, string> {
+): Record<string, ProjectAssignment> {
   const newAssignments = Object.fromEntries(
     Object.entries(currentAssignments).filter(([url]) => url !== projectUrl)
   );
-  newAssignments[projectUrl] = newOwnerId;
+  newAssignments[projectUrl] = {playerId: newOwnerId, assignmentTimestamp: Date.now()};
   return newAssignments;
 }
 
@@ -116,7 +117,7 @@ function handleMessage(
         }
         const completedUrl = message.payload.projectUrl;
         if (
-          latestSnapshot.projectAssignments[completedUrl] !== senderPlayerId
+          latestSnapshot.projectAssignments[completedUrl]?.playerId !== senderPlayerId
         ) {
           console.warn("player can't complete projectUrl it doesn't have");
           // we send the state back to the user since it looks like they
@@ -164,10 +165,10 @@ function handleMessage(
         delete newPlayers[playerToKickId];
 
         let newAssignments = {...latestSnapshot.projectAssignments};
-        for (const projectUrls of getAssignedProjects(latestSnapshot, playerToKickId)) {
+        for (const assignment of getAssignedProjects(latestSnapshot, playerToKickId)) {
           newAssignments = reassignProject(
             newAssignments,
-            projectUrls,
+            assignment.url,
             latestSnapshot.playerRecipientMap[playerToKickId] || Object.keys(latestSnapshot.players)[0],
           );
         };
@@ -424,10 +425,7 @@ const init = async () => {
             Object.keys(newPlayers)
           );
 
-          newSnapshot.projectAssignments = {
-            ...latestSnapshot.projectAssignments,
-            [player.originalProjectUrl]: player.id,
-          };
+          newSnapshot.projectAssignments = reassignProject(latestSnapshot.projectAssignments, player.originalProjectUrl, player.id);
         }
 
         room.history.push(newSnapshot);

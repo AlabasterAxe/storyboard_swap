@@ -38,6 +38,11 @@ export type ProjectInfo = {
   ownerId: string;
 }
 
+export type ProjectAssignment = {
+  playerId: string;
+  assignmentTimestamp: number;
+}
+
 export interface GameSnapshot {
   state: GameState;
   round: number;
@@ -48,7 +53,7 @@ export interface GameSnapshot {
   playerRecipientMap: Record<string, string>;
   players: Record<string, Player>;
   projects: Record<string, ProjectInfo>;
-  projectAssignments: Record<string, string>;
+  projectAssignments: Record<string, ProjectAssignment>;
 }
 
 export function initialGameState(): GameSnapshot {

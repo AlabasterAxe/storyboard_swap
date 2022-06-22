@@ -17,6 +17,7 @@ import {
   selectPlayer,
   state,
 } from "./app/store";
+import { Timer } from "./components/Timer";
 import "./Game.css";
 import { GameService, getGameService } from "./service/GameService";
 
@@ -37,9 +38,11 @@ function getOwnerForProject(
 
 function getBlockingPlayerName(
   currentGameState: GameSnapshot,
-  currentPlayerId: string | undefined,
+  currentPlayerId: string | undefined
 ): string | undefined {
-  for (const [senderId, recipientId] of Object.entries(currentGameState.playerRecipientMap)) {
+  for (const [senderId, recipientId] of Object.entries(
+    currentGameState.playerRecipientMap
+  )) {
     if (recipientId === currentPlayerId) {
       return currentGameState.players[senderId].displayName;
     }
@@ -67,13 +70,12 @@ function getProjectDisplayString(
 function InitialRoundPrompt({
   assignedUrl,
   currentPlayer,
-  gameState, 
+  gameState,
 }: {
-  assignedUrl: string,
-  currentPlayer: Player,
-  gameState: GameSnapshot
-}
-) {
+  assignedUrl: string;
+  currentPlayer: Player;
+  gameState: GameSnapshot;
+}) {
   return (
     <span>
       Start{" "}
@@ -93,11 +95,11 @@ function InitialRoundPrompt({
 function SubsequentRoundPrompt({
   assignedUrl,
   currentPlayer,
-  gameState, 
+  gameState,
 }: {
-  assignedUrl: string,
-  currentPlayer: Player,
-  gameState: GameSnapshot
+  assignedUrl: string;
+  currentPlayer: Player;
+  gameState: GameSnapshot;
 }) {
   return (
     <span>
@@ -153,15 +155,16 @@ function Game() {
     };
   }, [gameId, dispatch, reduxGameId]);
 
-  const onDoneClick = useCallback(()=>{
-    const assignedProjects = getAssignedProjects(currentGameState, currentPlayer?.id);
-    if (
-      assignedProjects.length > 0
-    ) {
+  const onDoneClick = useCallback(() => {
+    const assignedProjects = getAssignedProjects(
+      currentGameState,
+      currentPlayer?.id
+    );
+    if (assignedProjects.length > 0) {
       gameService?.send({
         cmd: ClientCommand.done,
         payload: {
-          projectUrl: assignedProjects[0],
+          projectUrl: assignedProjects[0].url,
         },
       });
     }
@@ -252,27 +255,40 @@ function Game() {
         );
         break;
       case GameState.in_progress:
-        const assignedProjects = getAssignedProjects(currentGameState, currentPlayer?.id);
+        const assignedProjects = getAssignedProjects(
+          currentGameState,
+          currentPlayer?.id
+        );
         if (assignedProjects.length > 0) {
-          const assignedUrl = assignedProjects[0];
+          const assignment = assignedProjects[0];
           body = (
             <>
-              {currentGameState.projects[assignedUrl].turns === 0 ? (
-                <InitialRoundPrompt assignedUrl={assignedUrl} currentPlayer={currentPlayer as Player} gameState={currentGameState}/>
+            <Timer durationMs={120000} startTimestamp={assignment.assignmentTimestamp} />
+              {currentGameState.projects[assignment.url].turns === 0 ? (
+                <InitialRoundPrompt
+                  assignedUrl={assignment.url}
+                  currentPlayer={currentPlayer as Player}
+                  gameState={currentGameState}
+                />
               ) : (
-                <SubsequentRoundPrompt assignedUrl={assignedUrl} currentPlayer={currentPlayer as Player} gameState={currentGameState}/>
+                <SubsequentRoundPrompt
+                  assignedUrl={assignment.url}
+                  currentPlayer={currentPlayer as Player}
+                  gameState={currentGameState}
+                />
               )}
-              <button
-                onClick={onDoneClick}
-              >
-                Done
-              </button>
+              <button onClick={onDoneClick}>Done</button>
             </>
           );
         } else {
           body = (
             <>
-              <span>Waiting for {getBlockingPlayerName(currentGameState, currentPlayer?.id) || "the other player"} to finish their project.</span>
+              <span>
+                Waiting for{" "}
+                {getBlockingPlayerName(currentGameState, currentPlayer?.id) ||
+                  "the other player"}{" "}
+                to finish their project.
+              </span>
             </>
           );
         }
@@ -288,27 +304,39 @@ function Game() {
             <div>{JSON.stringify(currentPlayer)}</div>
           </div>
         )}
-        {currentGameState?.players && currentPlayer?.id &&
+        {currentGameState?.players &&
+          currentPlayer?.id &&
           Object.keys(currentGameState?.players).includes(currentPlayer.id) && (
             <div className="player-container">
-              <h2>Players: </h2>
-              <ul>
-                {Object.values(currentGameState.players).map((p) => (
-                  <li key={p.id}>{p.displayName}{p.id === currentPlayer?.id ? " (you)" : ""}<span className="kick-button" onClick={()=>{
-                    if (gameService) {
-                      gameService.send({
-                        cmd: ClientCommand.kick,
-                        payload: {
-                          playerId: p.id,
-                        }
-                      });
-                      if(p.id === currentPlayer?.id){
-                        dispatch(clear({gameId}));
-                      }
-                    }
-                  }}>✖</span></li>
-                ))}
-              </ul>
+              <div className="player-tab">
+                <h2>Players: </h2>
+                <ul>
+                  {Object.values(currentGameState.players).map((p) => (
+                    <li key={p.id}>
+                      {p.displayName}
+                      {p.id === currentPlayer?.id ? " (you)" : ""}
+                      <span
+                        className="kick-button"
+                        onClick={() => {
+                          if (gameService) {
+                            gameService.send({
+                              cmd: ClientCommand.kick,
+                              payload: {
+                                playerId: p.id,
+                              },
+                            });
+                            if (p.id === currentPlayer?.id) {
+                              dispatch(clear({ gameId }));
+                            }
+                          }
+                        }}
+                      >
+                        ✖
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           )}
 
@@ -321,4 +349,3 @@ function Game() {
 // ========================================
 
 export default Game;
-
