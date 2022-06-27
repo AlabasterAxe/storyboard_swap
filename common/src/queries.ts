@@ -1,17 +1,24 @@
 import { GameSnapshot, ProjectAssignment } from "./model";
 
-export function getAssignedProjects(
+export function getAssignedProjectsFromSnapshot(
   state: GameSnapshot,
-  currentPlayerId: string | undefined
-): {url: string, assignmentTimestamp: number}[] {
-  if (!currentPlayerId) {
+  playerId: string | undefined
+): { url: string; assignmentTimestamp: number }[] {
+  return getAssignedProjects(state.projectAssignments, playerId);
+}
+
+export function getAssignedProjects(
+  assignments: Record<string, ProjectAssignment>,
+  playerId: string | undefined
+): { url: string; assignmentTimestamp: number }[] {
+  if (!playerId) {
     return [];
   }
 
   const result = [];
-  for (const [url, assignment] of Object.entries(state.projectAssignments)) {
-    if (assignment.playerId === currentPlayerId) {
-      result.push({url, assignmentTimestamp: assignment.assignmentTimestamp});
+  for (const [url, assignment] of Object.entries(assignments)) {
+    if (assignment.playerId === playerId) {
+      result.push({ url, assignmentTimestamp: assignment.assignmentTimestamp });
     }
   }
   return result;

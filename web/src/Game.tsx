@@ -157,7 +157,7 @@ function Game() {
 
   const onDoneClick = useCallback(() => {
     const assignedProjects = getAssignedProjects(
-      currentGameState,
+      currentGameState.projectAssignments,
       currentPlayer?.id
     );
     if (assignedProjects.length > 0) {
@@ -256,14 +256,17 @@ function Game() {
         break;
       case GameState.in_progress:
         const assignedProjects = getAssignedProjects(
-          currentGameState,
+          currentGameState.projectAssignments,
           currentPlayer?.id
         );
         if (assignedProjects.length > 0) {
           const assignment = assignedProjects[0];
           body = (
             <>
-            <Timer durationMs={120000} startTimestamp={assignment.assignmentTimestamp} />
+              <Timer
+                durationMs={120000}
+                startTimestamp={assignment.assignmentTimestamp}
+              />
               {currentGameState.projects[assignment.url].turns === 0 ? (
                 <InitialRoundPrompt
                   assignedUrl={assignment.url}
