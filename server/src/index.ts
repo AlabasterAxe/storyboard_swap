@@ -44,6 +44,7 @@ for (const usedProjectId of fs
 function getNewProjectUrl(): string {
   const projectId = availableProjectIds.values().next().value;
   availableProjectIds.delete(projectId);
+  console.log(`available project ids: ${availableProjectIds.size}`);
   fs.appendFileSync("./used-project-ids.txt", `${projectId}\n`);
   return `https://web.descript.com/${projectId}`;
 }

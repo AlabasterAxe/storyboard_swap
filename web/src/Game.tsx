@@ -126,7 +126,6 @@ function Game() {
   const [gameService, setGameService] = React.useState<GameService | undefined>(
     undefined
   );
-  const [invalidProjectUrl, setInvalidProjectUrl] = useState(false);
 
   useEffect(() => {
     window.history.replaceState(null, "Game", `/g/${gameId}`);
@@ -174,22 +173,10 @@ function Game() {
   if (!currentPlayer || currentPlayer.roomId !== gameId) {
     body = (
       <>
-        <div>
-          Create a new Storyboard + Live Collab Project, give edit access to
-          Descript HQ, and paste the URL below.
-        </div>
+        <div>Enter your name below and click "Join".</div>
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (
-              !currentPlayer?.originalProjectUrl ||
-              !validProjectRegex.test(currentPlayer?.originalProjectUrl)
-            ) {
-              setInvalidProjectUrl(true);
-              return;
-            }
-
-            setInvalidProjectUrl(false);
             if (gameService) {
               gameService.join();
             }
@@ -199,35 +186,10 @@ function Game() {
           <input
             value={currentPlayer?.displayName ?? ""}
             onChange={(e) => {
-              if (
-                !currentPlayer?.originalProjectUrl ||
-                validProjectRegex.test(currentPlayer.originalProjectUrl)
-              ) {
-                setInvalidProjectUrl(false);
-              }
               dispatch(player({ displayName: e.target.value }));
             }}
           />
-          <div>Project URL:</div>
-          <input
-            style={{ backgroundColor: invalidProjectUrl ? "pink" : "white" }}
-            value={currentPlayer?.originalProjectUrl ?? ""}
-            onChange={(e) => {
-              if (
-                currentPlayer?.originalProjectUrl &&
-                validProjectRegex.test(currentPlayer?.originalProjectUrl)
-              ) {
-                setInvalidProjectUrl(false);
-              }
-              dispatch(player({ originalProjectUrl: e.target.value }));
-            }}
-          />
-          <button
-            type="submit"
-            disabled={!currentPlayer?.originalProjectUrl || invalidProjectUrl}
-          >
-            Join
-          </button>
+          <button type="submit">Join</button>
         </form>
       </>
     );
@@ -316,7 +278,19 @@ function Game() {
                 <ul>
                   {Object.values(currentGameState.players).map((p) => (
                     <li key={p.id}>
-                      {p.displayName}
+                      <a
+                        href={p.originalProjectUrl + "?lite=true"}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={`${
+                          p.id === currentPlayer?.id
+                            ? "Your"
+                            : p.displayName + "'s"
+                        } project`}
+                      >
+                        {p.displayName}
+                      </a>
+
                       {p.id === currentPlayer?.id ? " (you)" : ""}
                       <span
                         className="kick-button"

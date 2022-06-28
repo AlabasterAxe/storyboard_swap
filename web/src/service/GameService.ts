@@ -32,7 +32,7 @@ export class GameService {
   private connectionFailures = 0;
 
   constructor(readonly gameId: string) {
-      this.reconnect();
+    this.reconnect();
   }
 
   private reconnect(): Promise<WebSocket> {
@@ -63,11 +63,13 @@ export class GameService {
       };
       this._ws.onopen = () => {
         const state: RootState = store.getState();
-        if (state.game.player?.originalProjectUrl && this._ws) {
-          this._ws.send(JSON.stringify({
-            cmd: ClientCommand.join,
-            payload: { player: state.game.player },
-          }));
+        if (this._ws) {
+          this._ws.send(
+            JSON.stringify({
+              cmd: ClientCommand.join,
+              payload: { player: state.game.player },
+            })
+          );
         }
         resolve(this._ws as WebSocket);
       };
@@ -81,12 +83,12 @@ export class GameService {
   }
 
   async join(): Promise<void> {
-      return this.reconnect().then();
+    return this.reconnect().then();
   }
 
   async send(message: ClientMessage): Promise<void> {
     if (message.cmd === ClientCommand.join) {
-        throw new Error("don't send the join message directly, call join()");
+      throw new Error("don't send the join message directly, call join()");
     } else {
       const resp = await fetch(getGameMessageEndpoint(this.gameId), {
         method: "POST",
@@ -119,8 +121,8 @@ export class GameService {
 
   shutdown(): void {
     if (this.watchdogTimeout) {
-        clearTimeout(this.watchdogTimeout);
-        this.watchdogTimeout = undefined;
+      clearTimeout(this.watchdogTimeout);
+      this.watchdogTimeout = undefined;
     }
     if (this._ws) {
       this._ws.close();
