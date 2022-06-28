@@ -26,8 +26,27 @@ import {
   getAssignedProjects,
   getAssignedProjectsFromSnapshot,
 } from "../../common/src/queries";
+import fs from "fs";
 
 const rooms = new Map<string, Room>();
+
+const availableProjectIds = new Set<string>(
+  fs.readFileSync("./project-ids.txt", "utf8").toString().split("\n")
+);
+
+for (const usedProjectId of fs
+  .readFileSync("./used-project-ids.txt", "utf8")
+  .toString()
+  .split("\n")) {
+  availableProjectIds.delete(usedProjectId);
+}
+
+function getNewProjectUrl(): string {
+  const projectId = availableProjectIds.values().next().value;
+  availableProjectIds.delete(projectId);
+  fs.appendFileSync("./used-project-ids.txt", `${projectId}\n`);
+  return `https://web.descript.com/${projectId}`;
+}
 
 const STATIC_ROOT = "../web/build";
 
@@ -433,9 +452,6 @@ const init = async () => {
 
       if (message.cmd === ClientCommand.join) {
         const clientPlayer: ClientPlayer = message.payload.player;
-        if (!clientPlayer.originalProjectUrl) {
-          return Boom.badRequest("must supply originalProjectUrl");
-        }
 
         for (const player of Object.values(
           room.history[room.history.length - 1].players
@@ -449,12 +465,9 @@ const init = async () => {
         }
         // we initialize a new player assigned to their own project url but we defer to the provided
         // client fields if they exist.
+        const playerUrl = clientPlayer.originalProjectUrl || getNewProjectUrl();
         let player: Player = {
-          ...newPlayer(
-            room.id,
-            clientPlayer.originalProjectUrl,
-            clientPlayer.displayName
-          ),
+          ...newPlayer(room.id, playerUrl, clientPlayer.displayName),
           ...(clientPlayer.roomId === room.id ? clientPlayer : {}),
         };
 
@@ -536,6 +549,14 @@ const init = async () => {
   server.route({
     method: "GET",
     path: "/api/ok",
+    handler: (request, h) => {
+      return "ok";
+    },
+  });
+
+  server.route({
+    method: "GET",
+    path: "/api/unused-project-urls",
     handler: (request, h) => {
       return "ok";
     },
