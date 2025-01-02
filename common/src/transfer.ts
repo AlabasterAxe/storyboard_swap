@@ -11,14 +11,14 @@ export interface ConnectRqst {
 }
 
 export enum ClientCommand {
+  join = "JOIN",
+
   // any client can decide to start the game
   start = "START",
 
   // this is used by players to indicate that they're done with their current
   // storyboard
   done = "DONE",
-
-  join = "JOIN",
 
   kick = "KICK",
 }
